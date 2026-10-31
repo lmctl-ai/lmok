@@ -3,138 +3,175 @@
 tree-sitter's incremental parsing engine as a single statically-linked,
 scriptable CLI.
 
-lmok wraps [tree-sitter](https://tree-sitter.github.io) 0.27.1 together
-with the [tree-sitter-json](https://github.com/tree-sitter/tree-sitter-json),
-[tree-sitter-c](https://github.com/tree-sitter/tree-sitter-c),
-[tree-sitter-python](https://github.com/tree-sitter/tree-sitter-python),
-[tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash),
-[tree-sitter-java](https://github.com/tree-sitter/tree-sitter-java), and
-[tree-sitter-go](https://github.com/tree-sitter/tree-sitter-go),
-[tree-sitter-javascript](https://github.com/tree-sitter/tree-sitter-javascript), and
-[tree-sitter-typescript](https://github.com/tree-sitter/tree-sitter-typescript) grammars in one dependency-free executable that can be driven from the command
-line or scripted with [lmscript](https://github.com/lmctl-ai). Feed it source text
-and it prints the concrete syntax tree; from lmscript you get a typed `Tree`
-object to inspect.
+lmok embeds [tree-sitter](https://tree-sitter.github.io) 0.27.1 and **11
+languages**: JSON, C, Python, Bash, Java, Go, JavaScript, TypeScript, TSX,
+lmscript and lmcode. The last two are syntax-analysis grammars; embedded
+lmcode bodies in `.lms` files remain opaque. No Node runtime is needed to
+run the standalone binary.
+
+- Parse/query source, extract facts, measure local metrics and token duplication.
+- Lint with **15 JSON packs (100 rule entries)** and **14 lmcode rule programs**;
+  see the [complete pack inventory](rules/README.md#pack-inventory).
+- Build a local SQLite knowledge tree with `index`, `symbols`, `refs`,
+  `findings` and `status`; `facts` also exports records without a DB.
+- Emit SARIF 2.1.0, compare baselines, preview/apply guarded autofixes, scan
+  secret-shaped literals with redacted output, and honor inline suppressions.
+- Run configured project checks through `ci`, or script the host with
+  [lmscript](https://github.com/lmctlhq/lmctl-mono).
+
+These are syntax checks and candidate references, not type inference or taint
+analysis. The CLI below describes current main; published artifacts are
+identified separately under [install](#published-host-and-raw-urls).
 
 ## Build and run
 
-The standalone CLI needs no Node runtime. Scripting and the test suite use
-[lmctl](https://lmctl.com), which supplies the `lmscript` command.
-
-Prerequisites for the commands below (Bash on Linux or macOS):
-
-- Git, curl, tar, and SHA-256 tools (`sha256sum` or macOS `shasum`); internet
-  access for the pinned source archives and npm package.
-- CMake >= 3.24, Ninja, and C/C++ compilers with C++17 support (GCC or Clang).
-  Linux builds also need static C/C++ runtime libraries; on Ubuntu these
-  come with `build-essential`. On macOS install Xcode Command Line Tools.
-- Node.js >= 24.15.0 and npm for `@lmctl-ai/lmctl@0.2.444`.
-- Python 3 for SQLite archive extraction and `./test.sh`, plus the usual Unix shell utilities. The SDK
-  headers are already checked in; no sibling `lmcode-cpp` checkout is needed.
-
-On Ubuntu, `sudo apt-get install build-essential cmake ninja-build git curl
-python3` installs the build tools (check CMake's version). Install Node
-separately if your distribution's package is older than 24.15.0. On macOS,
-install CMake and Ninja as well as the command-line compiler tools.
+Building needs Bash, Git, curl, tar, SHA-256 tools (`sha256sum` or macOS
+`shasum`), Python 3, CMake >= 3.24, Ninja, and C/C++17 compilers. Linux's
+static link needs static runtime libraries (`build-essential` on Ubuntu).
+macOS needs Xcode Command Line Tools plus CMake/Ninja. Node.js >= 24.15.0
+and npm are needed for scripting and the test compiler, not for the binary.
+Network access is needed for the initial source/dependency downloads.
 
 ```sh
 git clone https://github.com/lmctl-ai/lmok.git
 cd lmok
-npm install --prefix /tmp/lmok-tools @lmctl-ai/lmctl@0.2.444
-export PATH="/tmp/lmok-tools/node_modules/.bin:$PATH"
-lmscript --version   # lmscript 0.2.444
-scripts/sync-deps.sh   # pinned tree-sitter sources (third_party/, git-ignored)
+scripts/sync-deps.sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake --build build -j2
 export PATH="$PWD/build:$PATH"
-./test.sh
+build/lmok parse examples/data/sample.json
 ```
 
-Run all repository examples from this directory, in the same shell. The
-absolute PATH entry lets lmscript find the locally built host's schema and
-makes the `lmok` commands below work. If npm's commands are not found,
-add its global executable directory to PATH too.
-
-Produces `build/lmok`: one statically linked executable (`ldd` reports
-"not a dynamic executable" on Linux; macOS links only system libraries).
-The test suite rebuilds the host, checks dependency pins, and runs examples
-and rule fixtures, including native OS byte/path/linkage checks on every matrix runner.
+The standalone host build above needs no compiler checkout or Node runtime.
+**Scripting and the full test gate currently require Git access to the private
+`lmctlhq/lmctl-mono` repository.** With that access configured:
 
 ```sh
-lmscript examples/parse-string.lms
-build/```
+export LMSCRIPT_BIN="$(scripts/bootstrap-compiler.sh)"
+export PATH="$(dirname "$LMSCRIPT_BIN"):$PWD/build:$PATH"
+./test.sh
+"$LMSCRIPT_BIN" examples/parse-string.lms
+```
 
-The first command saves bytecode; the second prints the JSON text, its tree,
-`has_error -> false`, `nodes -> 34`, then the host's success record
-`{"ok": true, "result": null}`. See [all examples](examples/README.md).
+Run repository examples from this directory. Bootstrap builds the exact
+`compiler.lock` source revision once and caches it outside `build/`; reuse
+`LMSCRIPT_BIN` in this shell. The npm-only lmscript package lacks the compiler
+library needed by fixture export and cannot run the full gate. Compiler
+version strings alone do not establish compatibility. No sibling SDK checkout
+is needed: its headers are already vendored.
+
+Produces `build/lmok`; `ldd build/lmok` reports "not a dynamic executable" on
+Linux (macOS links system libraries). The test suite prints `PASS: N checks`.
+The parse-string script constructs and runs a program directly; expect the
+JSON text, its tree, `has_error -> false`, and `nodes -> 34`. It does not save
+a `.dslb` file. See [all examples](examples/README.md).
 
 ## Published host and raw URLs
 
-Every push to `main` builds and tests the five platform binaries. After they pass,
-CI compares committed HEAD with the latest `v*` tag and creates a release only if
-binary inputs changed: `cpp/`, `rules/`, `schema/`, `CMakeLists.txt`, `cmake/`,
-`deps.lock`, `sdk.lock`, embedded notices, or the build/stamp shell scripts.
-Tests/docs/CI-only changes since that tag log `SKIP release`; the rolling `dist`
-branch still updates. Eligible changes publish a GitHub Release (next patch after
-the latest `v*` tag, or the `VERSION` in `CMakeLists.txt` when that is higher;
-`lmok --version` in the release prints that tag) and updates the rolling `dist`
-branch. Pushing a `v*` tag by hand publishes that tag the same way.
-`lmscript install github:lmctl-ai/lmok` fetches the newest release.
+Verified on 2026-10-31: the latest GitHub Release is **v0.6.11**, newer than
+v0.6.0. Main and the rolling `dist` branch can advance independently; use a
+release tag for reproducibility. The five assets are `lmok-linux-x64`,
+`lmok-linux-arm64`, `lmok-macos-x64`, `lmok-macos-arm64`, and
+`lmok-windows-x64.exe`, plus `SHA256SUMS`.
 
-To use a published binary without building C++, install Node/npm and lmctl
-as above, then:
+**Compatibility:** the verified v0.6.11 and dist hosts expose `--dsl`,
+`--dsl-schema` and `--dsl-signatures`. Current main exposes only `--lmcode`,
+`--lmcode-schema` and `--lmcode-signatures`. Use the source-built host with
+main's pinned compiler and scripts; installing the latest release alone is
+not a substitute. The native parsing, linting and DB journeys were verified on both snapshots.
+
+With npm lmscript installed (the installer below was checked with
+`@lmctl-ai/lmctl@0.2.449`):
 
 ```sh
+npm install -g @lmctl-ai/lmctl@0.2.449
 lmscript install github:lmctl-ai/lmok@latest
 ```
 
-The install command resolves a GitHub release, checks its host version, and
-prints the executable path and checksum. It does not add `lmok` to your PATH.
-The repository rename alone does not rename existing release assets: maintainers
-must publish a matching release containing `lmok-linux-x64`, `lmok-linux-arm64`,
-`lmok-macos-x64`, `lmok-macos-arm64` and `lmok-windows-x64.exe` plus checksums
-before this renamed `@latest` path works. No release is created by this change.
-The rolling `dist` branch is separate; `@latest` selects a release, not `dist`.
-Use an explicit `@TAG` for a reproducible dependency once that release exists.
-Local builds on PATH work now without downloading a host.
+Use **`lmscript install`**, not `lmctl install` (the tested lmctl CLI rejects
+that command). It prints the resolved tag, executable path and checksum; add
+the printed executable's directory to PATH to invoke `lmok` by name. It does
+not add a shell command itself. `@v0.6.11` selects that fixed release.
+Installing a host does not install the source compiler needed by this repo's
+gate; use the bootstrap above when working from main (it currently requires
+private-repository access).
 
-From the repository root (or an empty directory for this inline-data example):
+Without Node, download a binary directly. This example is for **Linux ARM64**;
+choose the matching asset from the list above for another platform:
 
 ```sh
-mkdir -p build
+mkdir -p build/lmok-download
+curl -fL https://github.com/lmctl-ai/lmok/releases/download/v0.6.11/lmok-linux-arm64 -o build/lmok-download/lmok-linux-arm64
+curl -fL https://github.com/lmctl-ai/lmok/releases/download/v0.6.11/SHA256SUMS -o build/lmok-download/SHA256SUMS
+(cd build/lmok-download && sha256sum --ignore-missing -c SHA256SUMS)
+chmod +x build/lmok-download/lmok-linux-arm64
+build/lmok-download/lmok-linux-arm64 --version
+```
+
+For a rolling dist snapshot, substitute
+`https://raw.githubusercontent.com/lmctl-ai/lmok/dist/` for the release URL
+prefix in both downloads. A fixed dist commit in place of `dist` keeps the
+binary and checksums on the same snapshot. These flows were executed on Linux
+ARM64; other assets were inventoried, not executed in this review.
+
+With npm lmctl installed as above, complete source setup and put the built host on PATH:
+
+```sh
 lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmok/main/examples/parse-string.lms
 ```
 
-With a local build, put its directory on PATH. The local
-form `lmctl autorun examples/parse-string.lms` works too. `autorun` runs the
-outer script, which constructs a program and executes it with `run_lmcode`,
-printing the tree and forwarding host diagnostics. The `install=` declaration lets
-lmscript resolve a host when one is not on PATH. `@latest` is not a fixed
-version pin, and initial resolution needs network access.
-
-Raw URLs fetch the script, not a repository checkout or its data files.
-Examples reading `examples/data/` or `tests/fixtures/` still need the clone
-and repository-root working directory. The examples' output directories
-must exist before compilation.
+`LMSCRIPT_BIN` selects the bootstrapped interpreter for this invocation.
+The local form `"$LMSCRIPT_BIN" examples/parse-string.lms` works too.
+`run_lmcode` executes the program and forwards its output; there is no second
+bytecode-execution step. Raw URLs fetch a script, not its repository data.
+Scripts reading `examples/data/` or `tests/fixtures/` still need the clone and
+repository-root cwd; artifact-writing examples need `build/` to exist.
 
 ## CLI
 
+Use `build/lmok` below after building. These examples run from the repository
+root. Prepare scratch outputs first (`mkdir -p build/journey`). Only the
+`check` and `--lmcode` rows need these two bytecode fixtures and the restricted
+compiler setup above:
+
+```sh
+mkdir -p build/journey
+node scripts/compile-fixture.mjs examples/parse-string.lms build/journey/parse-string.dslb
+node scripts/compile-fixture.mjs rules/lmcode/c-function-metrics.lms build/journey/metrics.dslb
 ```
-lmok --version
-lmok --notices
-lmok --lmcode-schema [--json]
-lmok --lmcode-signatures
-lmok parse [--lang json|c|python|bash|java|go|javascript|typescript|tsx] FILE       # '-' reads stdin
-lmok query [--lang json|c|python|bash|java|go|javascript|typescript|tsx] [--pattern] PATTERN FILE  # '-' reads stdin
-lmok lint RULES.json FILE|DIR... [--db PATH] [--no-suppress] [--sarif FILE]
-        [--new-since RUN|--baseline FILE] [--fail-on-new] [--changed[=REV]]
-lmok ci [--config FILE] [--no-suppress] [--sarif FILE] [ROOT]
-lmok rules PACK... | test PACK FIXTURE...
-lmok findings [--rule ID] [--file PATH] [--db PATH]
-lmok facts [--lang json|c|python|bash|java|go|javascript|typescript|tsx] FILE|DIR...
-lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]
-lmok --lmcode FILE [--lmcode FILE ...]
-```
+
+`compile-fixture.mjs` is the repository's maintainer-only fixture exporter;
+it requires the bootstrapped `LMSCRIPT_BIN`. Ordinary scripts use `run_lmcode`
+instead of a public bytecode-export command.
+
+| Verb / option | What it does | Working example |
+| --- | --- | --- |
+| `parse` | Print the concrete syntax tree. | `build/lmok parse examples/data/sample.json` |
+| `query` | Print captured nodes and zero-based ranges. | `build/lmok query '(number) @n' examples/data/sample.json` |
+| `lint` | Run a JSON rule pack. | `build/lmok lint rules/c-tier1.json examples/data/sample.c` |
+| `ci` | Run project config and enforce its severity gate. | `build/lmok ci tests/fixtures/project-ci` (expected exit **1**, planted finding) |
+| `rules` | List rules and metadata as JSONL. | `build/lmok rules rules/c-tier1.json rules/json-tier1.json` |
+| `test` | Verify annotated positive/negative pack fixtures. | `build/lmok test examples/self-test/pack.json examples/self-test/fixture.c` |
+| `facts` | Extract definitions/references without a DB. | `build/lmok facts tests/fixtures/db/index/main.c` |
+| `index` | Persist file facts; skip unchanged files. | `build/lmok index tests/fixtures/db/index --db build/journey/index.db` |
+| `symbols` | Query stored symbols by SQL LIKE name pattern. | `build/lmok symbols '%' --lang c --db build/journey/index.db` |
+| `refs` | Query stored references by exact spelling. | `build/lmok refs helper --db build/journey/index.db` |
+| `findings` | Read live stored findings (empty before recording lint). | `build/lmok findings --db build/journey/index.db` |
+| `status` | Print DB location, counts and last run. | `build/lmok status --db build/journey/index.db` |
+| `check` | Dispatch compiled entry rules over source inputs. | `build/lmok check --lang c build/journey/metrics.dslb tests/fixtures/c-logic-violations.c` |
+| `outline` | Print live definitions, optionally ranked by DB references. | `build/lmok outline tests/fixtures/outline --budget 30` |
+| `metrics` | Report lines, functions and maximum nesting. | `build/lmok metrics examples/data/sample.c` |
+| `dup` | Find repeated normalized token windows within files. | `build/lmok dup --tokens 3 examples/data/sample.c` |
+| `--lmcode` | Run a compiled program body. | `build/lmok --lmcode build/journey/parse-string.dslb` |
+| `--version` | Print the binary's build version. | `build/lmok --version` |
+| `--notices` | Print embedded dependency licenses. | `build/lmok --notices` |
+| `--lmcode-schema` | Inspect the host/standard schema. | `build/lmok --lmcode-schema --json` |
+| `--lmcode-signatures` | List registered signatures. | `build/lmok --lmcode-signatures` |
+
+Run the DB rows in table order. `find` remains a design proposal. `outline`
+is available on current main; the checked v0.6.11/dist snapshots predate it. `--lang` accepts `json`, `c`, `python`, `bash`, `java`,
+`go`, `javascript`, `typescript`, `tsx`, `lmscript`, or `lmcode` for the
+source-analysis verbs. `index` infers languages from extensions.
 
 `parse` prints the concrete syntax tree as a single-line s-expression, like
 `tree-sitter parse` does. Malformed input still prints its tree — broken
@@ -142,7 +179,7 @@ regions appear as `(ERROR ...)` nodes — and still exits 0; tree-sitter always
 produces a tree. `query` runs a tree-sitter S-expression pattern over the
 document and prints one line per captured node, `kind
 start_row:start_col-end_row:end_col` (0-based). Both default to the JSON
-grammar; `--lang c|python|bash|java|go|javascript|typescript|tsx` switches grammars (an unknown language exits
+grammar; `--lang L` switches grammars (an unknown language exits
 2 with the known-languages list). `query --pattern` takes a code-shaped
 (semgrep-style) pattern instead of an S-expression — `strcpy($DST, $SRC)`, `$F(...)`, `if ($C) { return $V; }` —
 compiles it with the same grammar (first slice: c and python), prints the generated query on a `query:` line and
@@ -180,15 +217,14 @@ emits one output group per input: the `ts.report_json()` findings array, `N find
 Findings reported by the body form their own group, `N findings in body`, printed before the
 first file only when the body reported something. If an entry fails mid-walk, the group collected
 so far is printed, then the located error record, and the run stops with exit 3 (later inputs are
-not processed). Files are explicit; directories
-and stdin are not accepted. A fresh host arena and findings sink are used per
+not processed). File and directory inputs use the shared language-aware
+expansion; stdin is not accepted. A fresh host arena and findings sink are used per
 input. One invocation-owned return sink survives those per-file resets. Rule and severity metadata come from `ts.report` payloads; entry names
 are not silently used as finding ids. Every annotation is checked against the
 selected grammar at load: a misspelled kind, a supertype (abstract, e.g. `@expression`) or a hidden
 symbol is refused with exit 3 and a `LOAD_UNBOUND` record naming the entry, so a rule can never be
 silently dead; a rules file is therefore specific to one `--lang`. lmcode bytecode (DSLB v6) is the only accepted runtime
-format, so old bytecode must be recompiled. Install the private compiler with
-`npm install --prefix /tmp/lmok-tools @lmctl-ai/lmctl@0.2.444` when needed.
+format, so old bytecode must be recompiled. Use the pinned source compiler from the build instructions for fixtures.
 
 Successful `--lmcode` programs and `check` invocations append a terminal frame after
 the existing diagnostics (and after successful SARIF output):
@@ -206,8 +242,7 @@ required `parts`. Each program owns its sealed sink; host state is shared.
 `--first FILE` / `--last FILE` roles reorder execution while retaining add order.
 Tagged host_summary diagnostics preserve completed-program/input summaries. Runtime or application failures emit one failure envelope without result/parts. Finding
 IDs, order, suppression and entry HALT values retain their existing meanings.
-The [body/entry return example](examples/invocation-return.lmcode) requires the
-prepared slice 3 compiler until its release. See [invocation ownership and compiler staging](durable-memory/14-invocation-return.md).
+The [body/entry return example](examples/invocation-return.lmcode) uses the pinned source compiler from `compiler.lock`. See [invocation ownership and compiler staging](durable-memory/14-invocation-return.md).
 
 ## Local database status
 
@@ -221,17 +256,23 @@ symbols, refs, edges, runs and findings, and the last run (latest `started_at`,
 then id; `none` for an empty DB). Counts include superseded findings.
 It opens an existing DB read-only. If absent, it exits 2 with
 "run `lmok index` first" and creates neither the DB nor its directory.
-`index` is the next spike stage; it is not implemented by this DB layer.
+`index` is implemented; it populates file facts and text for the read verbs.
 
-For now, explicit `status --init` creates the empty schema and prints status.
+Explicit `status --init` creates the empty schema and prints status.
 It preserves a compatible existing DB and never overwrites an incompatible
 one. This is a bootstrap/diagnostic operation, not an indexing operation.
 
 ## Recording lint runs (`lint --db`, `findings`)
 
 ```sh
-lmok lint rules/c-tier1.json src/ --db .lmok/lmok.db
-lmok findings --rule LBC001
+mkdir -p build/journey
+build/lmok index tests/fixtures/db/index --db build/journey/index.db
+build/lmok symbols '%' --lang c --db build/journey/index.db
+build/lmok refs helper --db build/journey/index.db
+build/lmok findings --db build/journey/index.db
+build/lmok lint examples/rules/c-security.json examples/data/sample.c --db build/journey/index.db
+build/lmok findings --rule LBC001 --db build/journey/index.db
+build/lmok status --db build/journey/index.db
 ```
 
 `lint ... --db PATH` leaves stdout and exit codes byte-for-byte unchanged and
@@ -279,8 +320,9 @@ new. Keys are multisets: if a baseline holds one `goto used` for a file and
 the file now has two identical ones, the second is new.
 
 ```sh
-lmok lint rules/c-tier1.json src/ --db .lmok/lmok.db --new-since last --fail-on-new
-lmok lint rules/c-tier1.json src/ --baseline old.lintout
+build/lmok lint examples/rules/c-security.json examples/data/sample.c --db build/journey/index.db --new-since last --fail-on-new
+build/lmok lint rules/c-tier1.json examples/data/sample.c > build/journey/baseline.jsonl
+build/lmok lint rules/c-tier1.json examples/data/sample.c --baseline build/journey/baseline.jsonl --fail-on-new
 lmok lint rules/c-tier1.json . --changed          # working tree vs HEAD
 lmok lint rules/c-tier1.json . --changed=HEAD~3
 ```
@@ -323,7 +365,11 @@ the DB is reality, the baseline is a view.
 
 ## SARIF output (`--sarif FILE`)
 
-`lint`, `check` and `ci` accept `--sarif FILE`: the normal stdout is
+```sh
+build/lmok lint examples/rules/c-security.json examples/data/sample.c --sarif build/journey/results.sarif
+```
+
+This writes one LBC001 result. `lint`, `check` and `ci` accept `--sarif FILE`: the normal stdout is
 unchanged and a SARIF 2.1.0 log (the
 [examples/sarif-report.lms](examples/sarif-report.lms) mapping, ported into
 the host) is written to FILE after the run completes — version 2.1.0 with the
@@ -340,8 +386,6 @@ rule catalog is derived from the results, distinct ids in first-seen order;
 only. With zero findings the file is still written, with an empty `results`
 array. An unwritable FILE is exit 3.
 
-## Rule packs
-
 ## Metrics
 
 `lmok metrics FILE...` prints one JSON object per file with physical `lines`,
@@ -349,6 +393,8 @@ array. An unwritable FILE is exit 3.
 has no recognized extension. `lmok dup [--tokens N] FILE...` hashes normalized
 token windows within each file (identifiers and literals are replaced), and
 prints duplicate ranges; the default minimum window is 20 tokens.
+
+## Rule packs
 
 `lmok lint` reads a pack — conditions as data. Format:
 
@@ -396,7 +442,7 @@ prints duplicate ranges; the default minimum window is 20 tokens.
   query `#match?`.
 - Language: `rule.lang` overrides the pack-level `lang`; a rule with neither
   is a pack error. Known languages: `json`, `c`, `python`, `bash`, `java`,
-  `go`, `javascript`, `typescript`, `tsx`.
+  `go`, `javascript`, `typescript`, `tsx`, `lmscript`, `lmcode`.
 - Dispatch: per file, parse once per grammar used. `on` rules share ONE
   pre-order walk over the named nodes with a kind→rules index; `query` rules
   run one query cursor each over the root (merging them into the walk is a
@@ -408,7 +454,8 @@ prints duplicate ranges; the default minimum window is 20 tokens.
   its regular files — hidden files/dirs BELOW the argument skipped (the
   argument itself may live under a dot-path), only `.c`/`.h` (c), `.json`
   (json), `.py` (python), `.sh`/`.bash` (bash), `.java` (java), `.go` (go),
-  `.js` (javascript), `.ts` (typescript) and `.tsx` (tsx) are lintable, paths sorted
+  `.js` (javascript), `.ts` (typescript), `.tsx` (tsx), `.lms` (lmscript) and
+  `.lmcode` (lmcode) are recognized, paths sorted
   for byte-stable output, a file whose
   language has no rules in the pack is skipped silently, and a directory
   with no lintable files is a usage error (exit 2). A directory the walk
@@ -430,21 +477,12 @@ small demos; the canonical rule library is `rules/` (see below).
 ## Rule tiers
 
 Rules are classified by the information they need: tier 1 (CST shape + text)
-ships as packs in `rules/` — `c-tier1.json` (11 rules: unsafe calls, command
-exec, assignment-in-condition, K&R definitions, goto, FIXME/TODO, object-like
-macros, register, naming, commented-out code, malloc-result casts) and `json-tier1.json` (11 rules:
-credential keys, placeholders, nulls, key naming, numbers-as-strings, exact
-password key, sensitive credential keys, HTTP URLs, unpinned versions, empty
-containers, long strings), `python-tier1.json` (9 rules: os shell-out,
-shell=True, eval/exec, assert, FIXME/TODO, wildcard imports, bare except,
-print(), mutable default args), `bash-tier1.json` (6 rules: rm -rf,
-FIXME/TODO, backticks, unguarded cd, chmod 777, eval) and `go-tier1.json`
-(6 gosec-flavored rules: variable `exec.Command`, unsafe/weak-crypto imports,
-0777 file modes, blank assignment results, and `InsecureSkipVerify`), and
-`javascript-tier1.json` (4 syntax heuristics: eval, new Function, child_process
-imports and innerHTML writes), plus
-`typescript-tier1.json` and `tsx-tier1.json` provide three comparable checks for
-typed and JSX sources using independent parser registrations. lmcode-native
+ships as **15 JSON packs with 100 rule entries** in `rules/`: nine language
+packs (C, JSON, Python, Bash, Java, Go, JavaScript, TypeScript and TSX), four
+secrets packs (Bash, C, JSON, Python), and two autofix packs (Bash, C).
+See the [complete filename/count table](rules/README.md#pack-inventory).
+lmscript and lmcode have parsing/facts support but no shipped JSON pack.
+The **14 lmcode-native**
 rules in `rules/lmcode/` cover checks that need logic (function metrics, switch/if style, duplicate JSON
 keys and sibling string values, object size, nesting depth via `Node.has_parent()`/`parent()`, scanf width via
 query predicates, same-file symbol rules via set algebra, unquoted bash
@@ -466,7 +504,7 @@ lmok lint rules/c-tier1.json examples/data/sample.c
 ## Facts (knowledge tree, tier 3 / E6)
 
 ```sh
-lmok facts [--lang json|c|python|bash|java|go|javascript|typescript|tsx] FILE|DIR...
+lmok facts [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...
 ```
 
 Prints one JSON Lines record per definition, reference or edge found in each
@@ -484,7 +522,8 @@ name_col` (positions 0-based; the extent is the whole fact node, `name_*` is
 where the name starts). `confidence` is the honesty contract: `exact`
 (definitions, literal edges), `candidate` (name-matched references: calls,
 reads), `unresolved` (a `source "$DIR/x.sh"` target), `external`
-(`#include <stdio.h>`). Kinds per language:
+(`#include <stdio.h>`). Selected kinds (the complete per-language definitions live in
+[`queries/`](queries/)):
 
 - C: `def.function def.prototype def.macro def.struct def.union def.enum
   def.enumerator def.typedef def.variable def.parameter def.field def.label
@@ -569,7 +608,7 @@ second grammar is vendored: tree-sitter-c (pinned in `deps.lock`) with
 follow the same pattern: tree-sitter-python (`ts.parse_python` /
 `ts.query_python`) and tree-sitter-bash (`ts.parse_bash` / `ts.query_bash`),
 both pinned in `deps.lock` — these are the first grammars with an external
-scanner (`src/scanner.c`), wired into the CMake source list. Go (tree-sitter-go v0.25.0) is the sixth CLI grammar: use
+scanner (`src/scanner.c`), wired into the CMake source list. Go (tree-sitter-go v0.25.0) is also available: use
 `--lang go` for parse/query/check and `.go` files for lint/facts extension
 inference. The lmscript `ts.parse_*` lmcode surface remains unchanged. Example:
 `build/lmok lint rules/go-tier1.json tests/fixtures/go-tier1-violations.go`.
@@ -601,7 +640,7 @@ tier-1 packs.
 
 lmok-authored code is MIT licensed (see `LICENSE`). It builds against
 tree-sitter and the JSON, C, Python, Bash, Java, Go, JavaScript, TypeScript and
-TSX grammars, all MIT licensed, plus SQLite (public domain). Complete license
+TSX, lmscript and lmcode grammars, all MIT licensed, plus SQLite (public domain). Complete license
 texts are in `THIRD_PARTY_NOTICES.md`, also embedded in the binary (see
 `lmok --notices`). Made by
 **Lattice Systems LLC**.
@@ -750,9 +789,9 @@ The standalone binary includes the experimental lmscript and lmcode Tree-sitter
 parsers (analysis syntax, not runtime/type validation):
 
 ```sh
-lmok parse --lang lmscript workflow.lms
-lmok query --lang lmcode '(function_declaration name: (_) @name)' extracted.lmcode
-lmok facts workflow.lms extracted.lmcode
+lmok parse --lang lmscript tests/fixtures/script-languages/workflow.lms
+lmok query --lang lmcode '(function_declaration name: (_) @name)' tests/fixtures/script-languages/rule.lmcode
+lmok facts tests/fixtures/script-languages/workflow.lms tests/fixtures/script-languages/rule.lmcode
 ```
 
 `.lms` selects outer lmscript; `.lmcode` selects standalone inner lmcode.

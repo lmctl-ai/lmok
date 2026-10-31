@@ -1,10 +1,12 @@
 # Examples
 
 Run from the repository root after the [build and setup](../README.md#build-and-run).
-Use a source compiler with program/builder support (Mono main 0255ef01 or later) with the matching host on PATH:
+Scripting setup currently requires access to private `lmctlhq/lmctl-mono`.
+Use the compiler pinned in `compiler.lock` (bootstrap once per session), with
+the matching host on PATH:
 
 ```sh
-export PATH="$PWD/build:$PATH"
+export PATH="$(dirname "$LMSCRIPT_BIN"):$PWD/build:$PATH"
 mkdir -p build
 lmscript examples/parse-string.lms
 ```
@@ -16,8 +18,10 @@ returns the success or failure envelope to the script. Each script's expect
 comments pin its domain output.
 
 The `install="github:lmctl-ai/lmok@latest"` declaration can resolve a
-published host when one is not on PATH, once maintainers publish renamed
-`lmok-OS-ARCH` release assets. The repo rename alone does not create those assets. It follows the latest release,
+published host when one is not on PATH. The renamed assets are published;
+latest resolved v0.6.11 in the 2026-10-31 review. That host still uses the
+old `--dsl` flags: main examples require the source-built host and pinned
+compiler above. It follows the latest release,
 not a fixed version pin. Compilation is offline once the local host and
 compiler are available. Raw URL invocation and its working-directory
 requirements are covered in the [README](../README.md#published-host-and-raw-urls).
@@ -127,10 +131,13 @@ To run the entry dispatcher over an existing rule file and a C input, use the
 explicit language flag:
 
 ```sh
-lmok check --lang c build/c-function-metrics.dslb examples/data/sample.c
+mkdir -p build/rules-lmcode
+node scripts/compile-fixture.mjs rules/lmcode/c-function-metrics.lms build/rules-lmcode/c-function-metrics.dslb
+build/lmok check --lang c build/rules-lmcode/c-function-metrics.dslb examples/data/sample.c
 ```
 
-The command parses each named input once and resets transient trees/findings
+The exporter requires the bootstrapped `LMSCRIPT_BIN`; it is a maintainer
+fixture helper. The command parses each named input once and resets transient trees/findings
 between inputs. Cross-file aggregation remains a body-level `--lmcode` concern.
 
 `bash examples/secrets.sh` demonstrates opting in to the JSON and Python secret

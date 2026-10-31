@@ -1,4 +1,4 @@
-# Rule tiers (v0.3.0)
+# Rule tiers
 
 The owner-set three-tier strategy for rules — lmok stays a simple CLI, no
 platform. Framework, inventory, and reference keys: `docs/rule-tiers.md`.
@@ -6,14 +6,18 @@ Membership test: "what information does the rule need?" — CST shape + text
 (tier 1, ship now as packs), CST + one named mechanical extension (tier 2,
 plan then build), real semantics (tier 3, defer).
 
-## Shipped (tier 1)
+Current inventory: **11 languages**, **15 packs / 100 rule entries**, and
+**14 lmcode programs**. See the [complete current table](../rules/README.md#pack-inventory).
+Milestone sections below describe their original scope, not a language limit.
 
-- `rules/c-tier1.json` — 10 rules (LBC001–LBC010): unsafe calls, FIXME/TODO
+## Original C/JSON tier-1 inventory
+
+- `rules/c-tier1.json` — 11 rules (LBC001–LBC011): unsafe calls, FIXME/TODO
   comments, goto, command exec, assignment in if/while condition (two
   patterns in one query string — multi-pattern queries work fine), K&R
   definitions (`((function_definition (declaration)) @kr)` — the extra
   grouping parens make the capture land once on the outer node), object-like
-  macros, register, snake_case function names, commented-out code.
+  macros, register, snake_case function names, commented-out code, and malloc-result casts.
 - `rules/json-tier1.json` — 11 rules (LBJ001–LBJ010 plus LBJ104): credential
   keys, placeholder strings, null values, snake_case keys, numbers-as-strings,
   exact sensitive credential keys, HTTP URL values, unpinned versions, empty
@@ -85,7 +89,7 @@ to `{Json, C, Python, Bash}`; lmcode surface mirrors the C pair
 (`ts.parse_python`/`ts.query_python`/`ts.reparse_python`, same for bash);
 CLI `--lang python|bash`; lint extension map `.py` → python, `.sh`/`.bash` →
 bash (directory expansion filter widened too). One existing test.sh pin had
-to move: the unknown-language error now lists all four languages.
+to move: the error listed four languages at that milestone; current main lists all 11.
 
 - `rules/python-tier1.json` — 9 rules (LBP001–LBP009): os.system/popen
   (attribute-identifier query + `#match?`), shell=True keyword (`value:

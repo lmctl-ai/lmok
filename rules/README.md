@@ -6,14 +6,9 @@ Three delivery forms, by how much logic a rule needs:
   dispatcher: a tree-sitter `query` pattern or an `on` node kind, an optional
   `text_matches` regex, message, severity. No code. See [rule tiers](../docs/rule-tiers.md)
   for the framework and [Rule packs](../README.md#rule-packs) for the format.
-  Shipped: `c-tier1.json` (11 rules), `json-tier1.json` (11 rules:
-  LBJ001–LBJ010 and LBJ104), `python-tier1.json` (9 rules),
-  `bash-tier1.json` (6 rules), `go-tier1.json` (6 rules, GOS001–GOS006), and
-  `javascript-tier1.json` (4 rules, JS001–JS004), and
-  `typescript-tier1.json` (3 rules, TS001–TS003), and `tsx-tier1.json` (3 rules, TX001–TX003). The opt-in `bash-autofix.json` and
-  `c-autofix.json` packs demonstrate four token-safe plain replacements. A
-  pack `fix` is a literal replacement for the reported node; it does not
-  perform metavariable substitution.
+  The complete current inventory is below: nine tier-1 packs, four secrets
+  packs and two autofix packs. Pack `fix` text is a literal node replacement,
+  not metavariable substitution.
   JSON checks cover credential keys, placeholders, nulls, key naming, numeric
   strings, HTTP URLs, unpinned versions, empty containers, and long source
   strings. The length threshold is >200 source bytes excluding quotes, not
@@ -96,10 +91,40 @@ Three delivery forms, by how much logic a rule needs:
   text and zero width; `n.is_missing()` tells it apart. In the Python grammar
   `lambda`, `await`, `yield` and `type` are both a named node and an anonymous
   token, so a rule on those kinds fires twice per construct unless it checks
-  `n.is_named()` (the other three grammars have no such spelling).
+  `n.is_named()` (check namedness when subscribing to a spelling shared by tokens and nodes).
 
 - **Teaching examples** (`examples/*.lms`) — the same techniques in
   narrative order; read these first.
+
+## Pack inventory
+
+Current main has **15 packs / 100 rule entries**. Counts are entries per pack,
+not globally distinct IDs: secret checks intentionally recur across languages.
+The binary supports 11 languages; lmscript and lmcode have parsing/facts support
+but no shipped tier-1 JSON packs yet.
+
+| Pack | Language | Rules |
+| --- | --- | ---: |
+| [bash-autofix.json](bash-autofix.json) | bash | 2 |
+| [bash-tier1.json](bash-tier1.json) | bash | 6 |
+| [c-autofix.json](c-autofix.json) | c | 2 |
+| [c-tier1.json](c-tier1.json) | c | 11 |
+| [go-tier1.json](go-tier1.json) | go | 6 |
+| [java-tier1.json](java-tier1.json) | java | 9 |
+| [javascript-tier1.json](javascript-tier1.json) | javascript | 4 |
+| [json-tier1.json](json-tier1.json) | json | 11 |
+| [python-tier1.json](python-tier1.json) | python | 9 |
+| [secrets-bash.json](secrets-bash.json) | bash | 13 |
+| [secrets-c.json](secrets-c.json) | c | 7 |
+| [secrets-json.json](secrets-json.json) | json | 7 |
+| [secrets-python.json](secrets-python.json) | python | 7 |
+| [tsx-tier1.json](tsx-tier1.json) | tsx | 3 |
+| [typescript-tier1.json](typescript-tier1.json) | typescript | 3 |
+
+The **14 lmcode programs** add function metrics, C/Python cognitive complexity,
+switch/branch style, nesting, scanf-width checks, same-/cross-file symbol sets,
+JSON duplicate keys/values and object size, and Bash quoting checks. Secrets
+are heuristic, redacted shape checks; autofixes are deliberately narrow.
 
 ## Using an lmcode rule
 
@@ -114,23 +139,30 @@ with a raw script URL:
 ```sh
 export PATH="$PWD/build:$PATH"
 mkdir -p build/rules-lmcode
-lmscript rules/lmcode/c-function-metrics.lms
+node scripts/compile-fixture.mjs rules/lmcode/c-function-metrics.lms build/rules-lmcode/c-function-metrics.dslb
 build/lmok check --lang c build/rules-lmcode/c-function-metrics.dslb tests/fixtures/c-logic-violations.c
 ```
 
-Expect a findings array containing LBC101 and LBC102, `2 findings`, then
-`{"ok": true, "result": null}`. The directory creation is required:
-`savedsl` does not create parent directories. Its path in the script chooses
-the bytecode filename; passing another argument to `lmscript` does not
-change it.
+`LMSCRIPT_BIN` must point to the compiler built by `scripts/bootstrap-compiler.sh`.
+The fixture exporter is a repository maintainer helper, not a public lmscript
+bytecode-export API. Running an entry-only `.lms` directly invokes its body;
+it neither saves bytecode nor dispatches rules over an input file.
 
-Run all twelve rule demos:
+Expect LBC101 and LBC102 findings, `2 findings in tests/fixtures/c-logic-violations.c`,
+and a terminal `LMCODE_RETURN_BEGIN` / JSON envelope / `LMCODE_RETURN_END` frame.
+Output directories must exist before fixture export.
+
+Run all 14 rule programs against their fixtures:
 
 ```sh
 for source in rules/lmcode/*.lms; do
-  lmscript "$source" || exit 1
   bytecode="build/rules-lmcode/$(basename "$source" .lms).dslb"
+  node scripts/compile-fixture.mjs "$source" "$bytecode" || exit 1
   spec="$(sed -n 's/^# check: //p' "$source")"
+  case "$source" in
+    *c-function-cognitive-complexity.lms) spec="c tests/fixtures/c-logic-violations.c" ;;
+    *python-function-cognitive-complexity.lms) spec="python tests/fixtures/python-logic-violations.py" ;;
+  esac
   if [ -n "$spec" ]; then
     read -r lang input <<< "$spec"
     build/lmok check --lang "$lang" "$bytecode" "$input" || exit 1
@@ -140,11 +172,10 @@ for source in rules/lmcode/*.lms; do
 done
 ```
 
-Expected finding counts: function metrics 2, switch style 2, duplicate keys
-2, size limits 1, C nesting 1, JSON nesting 1, scanf width 1, same-file
-symbols 3, cross-file calls 1, sibling duplicate values 4, python function
-metrics 1, bash unquoted variables 3. Exact findings appear in each script's
-`# expect:` / `#|` comments. Findings do not make the process fail.
+Exact domain output for the fixture-backed examples is in their `# expect:` /
+`#|` comments. Cognitive-complexity scoring has dedicated hand-computed oracles
+in `tests/check-metrics.py`; these commands only exercise its entry path.
+Findings alone do not make `check` exit nonzero.
 
 For the data-only packs, no lmscript compilation is needed:
 

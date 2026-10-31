@@ -1,6 +1,10 @@
 # Build, run, and test
 
-- Sync sources: `scripts/sync-deps.sh` (tree-sitter + tree-sitter-json into
+- Scripting/the full gate currently need Git access to private `lmctlhq/lmctl-mono`;
+  standalone CMake host builds do not. First bootstrap once per session: `export LMSCRIPT_BIN="$(scripts/bootstrap-compiler.sh)"`,
+  then `export PATH="$(dirname "$LMSCRIPT_BIN"):$PWD/build:$PATH"`. The npm-only
+  package cannot compile repository fixtures. See [prerequisites](../README.md#build-and-run).
+- Sync sources: `scripts/sync-deps.sh` (tree-sitter, all 11 grammars and SQLite into
   `third_party/`, sha256-verified, idempotent; `--verify` checks the pins).
 - Vendor SDK: `scripts/sync-sdk.sh` needs an lmcode-cpp checkout
   (`LMCODE_CPP=/path/to/lmcode-cpp`); `sdk.lock` then pins every vendored
@@ -11,7 +15,7 @@
 - Test: `./test.sh` runs the native host checks (pin verifies — including a digest of
   the extracted third_party/ trees, build, `--version`, `--notices`
   byte-compare, embedded-schema byte-compare, full and `--without-std`
-  signature parity with `lmscript >= 0.2.442`, CLI parse/query/lint cases,
+  signature parity with the `compiler.lock` source compiler, CLI parse/query/lint cases,
   rule packs against violations/clean fixtures, lmcode bytecode runs, examples,
   rules/lmcode, the reparse contract, the v0.4.0 review regressions — regex
   bound, arena caps/reset, directory-walk errors, predicate semantics —
@@ -23,9 +27,10 @@
 
 ## Adding an example
 
-1. Create `examples/<name>.lms` using `_dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest"`.
-2. Compile and run: `PATH=$PWD/build:$PATH lmscript examples/<name>.lms build/<name>.dslb && ./build/lmok --lmcode build/<name>.dslb`.
+1. Create `examples/<name>.lms` using `_lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest"` and `run_lmcode`.
+2. Run with `"$LMSCRIPT_BIN" examples/<name>.lms`; ordinary scripts do not save bytecode.
 3. Add expected output assertions (`#| <expected>` header lines) for `./test.sh`.
+4. For maintainer entry fixtures, use `node scripts/compile-fixture.mjs INPUT OUTPUT.dslb`, then `build/lmok check --lang LANG OUTPUT.dslb INPUT_SOURCE`.
 
 ## Adding a host function/method
 
@@ -37,15 +42,10 @@
 
 ## Releases
 
-Binaries are built by the `ci` workflow on every push to `main` (plus manual
-`workflow_dispatch`, where the `only` input selects one matrix leg; pushes
-always run all five legs: linux-x64, linux-arm64, macos-arm64, macos-x64,
-windows-x64) and published by force-updating the rolling `dist` orphan branch
-on main; there is no release job. The Windows leg builds the full host with
-MinGW (`choco install mingw ninja`); tree-sitter is portable C and the SDK is
-standard-library-only with `_WIN32` paths, so no stub is needed — unlike
-lmcurl, whose stub exists only because native TLS/curl packaging is deferred
-there.
+The repository publishes five platform binaries through GitHub Releases and a
+rolling `dist` branch. See [verified install commands and the release/main flag
+boundary](../README.md#published-host-and-raw-urls). A release or dist binary may
+lag main's compiler contract; use source setup for the full gate.
 
 ## Native host flag contract
 

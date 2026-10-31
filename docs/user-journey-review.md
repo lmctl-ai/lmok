@@ -1,90 +1,131 @@
 # New-user journey review
 
-Reviewed 2026-10-28 on branch `docs/user-journey`, starting at
-`dd3690ddbd0bfe3e706f2f2f2d965e5f3c095d45`.
-The [published README](https://github.com/lmctl-ai/lmok/blob/main/README.md)
-was fetched from GitHub's raw endpoint and matched the starting checkout.
-All changes in this review are documentation or example header comments;
-script behavior and `# expect:` / `#|` lines are unchanged.
+Reviewed **2026-10-31**, starting from main `b3a6537`, then rebased through `f904436` (outline) onto `5440a29`, on Linux ARM64.
+This replaces the October 28 pre-rename review: its `savedsl`, two-step
+script execution, v0.4.0 install and 53-check claims no longer describe main.
+Changes here are documentation and the compiler invocation in
+`examples/metrics.sh`; no host, rule logic, workflow or version changes.
 
 ## Findings
 
-High = prevents completing a documented path; medium = misleading behavior
-or missing setup; low = inventory/navigation or nonblocking diagnostic.
+High = blocks a documented path; medium = misleading setup/behavior;
+low = inventory or navigation.
 
-| Severity | Friction and evidence | Resolution |
+| Severity | Friction / observed evidence | Resolution |
 | --- | --- | --- |
-| High | No prerequisite list: the build requires CMake >= 3.24, Ninja, C/C++17 compilers and Linux static runtime libraries; dependency sync requires Bash, curl, tar and SHA-256 utilities. | Fixed: explicit prerequisites and Ubuntu/macOS setup notes. All tools were present on the review machine; these were missing from docs, not missing locally. |
-| High | npm setup omitted Node's version floor. Published `@lmctl-ai/lmctl@0.2.442` metadata requires Node >= 24.15.0; tests additionally require Python 3. | Fixed: tested npm version and runtime floor, Python requirement, compiler version check. |
-| High | No clone/cd instruction or PATH export; `lmok` is not installed by CMake. lmscript also needs a host for schema discovery. | Fixed: clone, repo-root working directory, absolute build PATH, explicit `build/lmok` example commands. |
-| High | Raw URL in an empty directory fails at `savedsl`: `cannot write build/parse-string.dslb: ENOENT`. | Fixed: `mkdir -p build` before raw-URL compilation. |
-| High | The exact rules README command fails at `savedsl`: `cannot write build/rules-lmcode/c-function-metrics.dslb: ENOENT`. | Fixed: create `build/rules-lmcode` before compiling rules. |
-| High | SARIF header says to execute `build/sarif-results.dslb`; the script actually saves `build/sarif-report.dslb`. | Fixed: header command only. The `.sarif` artifact remains `build/sarif-results.sarif`. |
-| Medium | README presents `lmctl autorun` as the complete example run, but it only runs the outer script and saves bytecode; no JSON tree is printed. The standalone Scripting snippet likewise lacked execution instructions. | Fixed: separate compile/save and host execution steps, expected output including the success record. |
-| Medium | `lmscript SOURCE OUTPUT.dslb` appears to select an output filename. Probe with `build/ignored-argument.dslb` produced no such file; the script's literal `savedsl` target was used. | Fixed: remove misleading positional arguments and explain that these are script arguments. |
-| Medium | "Each compiles to bytecode" is false for `lint-repo.lms`, which runs subprocesses and never saves a bytecode file. | Fixed: all-example loop special-cases it; documented its one-line result. |
-| Medium | "Nothing (offline)" headers omit the compiler, host/schema, output directory and cwd requirements. | Fixed: example headers refer to setup; docs distinguish offline-after-setup from first network resolution. Rule header shorthand is qualified by rules/README setup. |
-| Medium | Raw URL execution does not fetch data files. `parse-file.lms` compiles in an empty directory but the host exits 3 with `file_read: examples/data/sample.json: No such file or directory`. | Fixed: explain repository fixtures and cwd requirements. Inline-data parse-string works without a checkout once the output directory exists. |
-| Medium | `install="github:lmctl-ai/lmok@latest"` is described as a pin; it follows a moving release. Installation also does not put the executable on shell PATH. | Fixed: explain release resolution, printed executable path, PATH setup, fixed `@v0.4.0`, and the separate rolling dist branch. No packaging/code fix needed on tested platform. |
-| Medium | Rule reuse instructions imply every check is one annotated SAM function. scanf pairing and symbol/cross-file checks require helper/set/dispatch logic too. | Fixed: describe both forms and copying their calling logic. |
-| Low | JSON pack says five rules but contains six including LBJ104; tier inventory puts LBJ104 under lmcode; cross-file demo/LBC110 is omitted and E3 still calls cross-file references impossible. | Fixed: counts, placement, cross-file inventory and stale E3 wording. |
-| Low | Paths to tier docs and examples are plain code text, and relative navigation is unclear from subdirectories. | Fixed: clickable repository-relative links across the four requested documents; link targets checked locally. |
-| Low | Intro and license summary omit the shipped C grammar. | Fixed: name and link tree-sitter-c. |
-| Low | `test.sh` check 38 still says "all 5 rules" for the six-rule JSON pack. | Fixed by the concurrent JSON-rule expansion merged during publication; the original review found no behavioral defect. |
-| Low | GCC emits an unused-function warning for `ts(Node&)` in `cpp/host.cpp`. | Needs optional code cleanup; build succeeds. No code changed. |
+| High | Bootstrap fetches private `lmctlhq/lmctl-mono` (GitHub API confirms private visibility). Main CI run [41230275702](https://github.com/lmctl-ai/lmok/actions/runs/41230275702) fails all five compiler-install jobs with Git credential errors. | **Needs packaging/access work outside this docs-only task.** This machine's authenticated bootstrap succeeds; public users cannot reproduce the full gate without access. README now separates the standalone native build from restricted scripting/test setup. No workflow or credential changes made. |
+| High | npm-only lmscript cannot export the repository fixtures; package version is not the compiler contract. | Fixed docs: bootstrap `compiler.lock` once, export `LMSCRIPT_BIN` and its directory plus the built host on PATH. Bootstrap completed and its smoke test passed. |
+| High | Published v0.6.11 and dist accept `--dsl*`, while main accepts only `--lmcode*`. `--lmcode-schema --json` exits 2 on both published hosts. Raw-URL `lmctl autorun` without the source-built host likewise exits 2 after selecting the published host. | Documented compatibility boundary. **Publication work remains** to ship main's renamed host contract; main scripts must use the matching source-built host. No code workaround added. |
+| High | `lmctl install github:lmctl-ai/lmok` is an unknown command. | Fixed docs: `lmscript install github:lmctl-ai/lmok@latest` resolves v0.6.11, validates SHA-256 and prints its cached executable path. Installation does not put `lmok` on PATH. |
+| High | Positional `lmscript SOURCE OUTPUT.dslb` and old `savedsl` instructions no longer export bytecode. Direct entry-only scripts do not dispatch rules over source inputs. | Fixed docs: ordinary scripts use `run_lmcode`; entry fixtures use `node scripts/compile-fixture.mjs` followed by `check`. Explicitly label exporter as a maintainer helper. Updated `examples/metrics.sh`, which previously tried to check a nonexistent exported file. |
+| Medium | Build prerequisites, compiler/host PATH, output directories and repo-root cwd were scattered or missing. | Consolidated source setup, compiler cache explanation, prerequisites and scratch-directory commands. No missing local prerequisite was encountered. |
+| Medium | Raw URLs fetch only the script, not referenced fixture files. `@latest` is moving, not a pin. | Fixed docs: distinguish source/raw URL, release install and dist download; explain cwd, PATH and fixed tags/commits. Raw parse-string invocation passed with the source setup. |
+| Medium | Status documentation said index did not exist; CLI overview omitted shipped verbs. | Fixed: table covers all 16 named verbs and host inspection/execution options; runnable DB sequence and baseline/SARIF examples. `outline` landed during review and was added; `find` and `ts.db_*` remain proposals. |
+| Medium | Older four-language inventories and a partial pack list concealed current coverage. | Fixed current-facing docs: 11 grammars, 15 JSON packs / 100 rule entries, 14 lmcode programs. Historical four-language milestone sections are identified as historical. |
+| Medium | The supplied v0.6.0 release assumption was stale. | Live release API/installer resolve v0.6.11; README names the checked date and platform. Release and dist can lag main independently. |
+| Low | Memory index omitted metrics, rule contracts, secrets and Java; invocation-return/script-language notes were loose bullets instead of table entries. | Added all six to the document map and checked every current memory file has a table link. |
+| Low | `check` documentation claimed explicit files only; current dispatcher accepts directories. | Corrected accepted input forms. |
 
-## Published install verification
+## Published artifacts
 
-The release flow works on Linux ARM64; there is **no observed dist/release
-layout blocker**. With no `lmok` on PATH, raw-URL compilation resolved
-and downloaded the host into a fresh cache under the review workspace.
-Its release metadata identifies `v0.4.0`, asset `lmok-linux-arm64`.
-The executable reports `lmok 0.4.0`; its actual SHA-256 is:
+The GitHub latest-release API returned **v0.6.11**, published
+2026-10-31T11:29:37Z. Dist was
+`cf2c06db495d7923d430dd014c823341f6702e9d`.
+Both Linux ARM64 downloads passed their own SHA256SUMS manifest:
 
-```
-725352922dec53b4ceaef138eb697fa4cfbae66e3f97b910e6b849ae64555c5f
+```text
+6e3466da21448371a61f6cd797353982be1c2b61ac81e7820cba95f897a999e3
 ```
 
-That matches the ARM64 entry in the published
-[dist SHA256SUMS](https://github.com/lmctl-ai/lmok/blob/dist/SHA256SUMS).
-Both `lmscript install github:lmctl-ai/lmok@latest` and the explicit
-`@v0.4.0` selector resolved successfully. The
-[v0.4.0 release](https://github.com/lmctl-ai/lmok/releases/tag/v0.4.0)
-and [dist branch](https://github.com/lmctl-ai/lmok/tree/dist) each expose
-five platform executables plus SHA256SUMS. Only Linux ARM64 was executed;
-asset presence does not establish runtime correctness on the other four.
+Both report `lmok 0.6.11`; the install cache has the same hash. Release asset
+inventory contains Linux x64/ARM64, macOS x64/ARM64 and Windows x64 plus the
+checksum manifest. Only Linux ARM64 was executed in this review.
 
-Verified local and raw-URL `lmctl autorun` forms, followed by `--lmcode`.
-After creating the output directory, the raw parse-string example also ran
-successfully in an otherwise empty directory within the workspace.
+Each published binary passed parse/facts for all 11 languages, query (native
+and code-shaped), lint, rules, annotated fixture test, metrics, dup, project
+ci, and the full DB/baseline/SARIF/autofix/suppression sequence below. `ci`
+exits **1** on `tests/fixtures/project-ci` as intended for its planted finding.
+Their schema/signature probes pass under the older `--dsl*` spellings.
+This is not a claim that release bytecode/compiler compatibility matches main.
 
-## Build and example results
+## Tier-3 journey, end to end
 
-Environment: Linux aarch64, GCC 13.3.0, CMake 3.28.3, Ninja 1.11.1,
-Node 24.22.0, Python 3.12.3, lmscript 0.2.442.
+Run from the clone root after building. Use a fresh DB path for these counts:
 
-The original `scripts/sync-deps.sh`, CMake configure and CMake build
-commands succeeded unchanged. No extra SDK checkout/sync was necessary.
-All 13 examples and all nine lmcode rule demos passed their declared
-expected output against the downloaded v0.4.0 executable after the documented
-setup omissions were supplied. `lint-repo.lms` ran as an outer script;
-the other 21 programs were compiled and executed with `--lmcode`.
+```sh
+mkdir -p build/journey
+build/lmok index tests/fixtures/db/index --db build/journey/index.db
+build/lmok index tests/fixtures/db/index --db build/journey/index.db
+build/lmok symbols '%' --lang c --db build/journey/index.db
+build/lmok refs helper --db build/journey/index.db
+build/lmok findings --db build/journey/index.db
+build/lmok status --db build/journey/index.db
+build/lmok lint examples/rules/c-security.json examples/data/sample.c --db build/journey/index.db
+build/lmok findings --rule LBC001 --db build/journey/index.db
+build/lmok status --db build/journey/index.db
+```
 
-The local test suite passed **53/53 checks**, including all examples, nine
-violation/clean rule pairs, SARIF structure and fully static linkage.
-A second `./test.sh` run started with no `build/` directory and passed
-**53/53 checks** again; downloaded, hash-verified dependencies were retained.
-The revised documented all-example and all-rule loops were also exercised.
+Observed on main and both published binaries:
 
-No blocking code defect was found. Remaining follow-ups are the unused-helper warning above and execution on
-other platforms. The counts above describe the original review revision.
-No workflow or executable source was edited by this documentation change.
+- First index: `indexed 5 files (0 unchanged, 0 removed)`; second: zero
+  indexed, five unchanged.
+- Symbols include `helper`, `main`, the `add` prototype and parameters;
+  refs reports the `helper` call at `main.c 4:24-4:33` (zero-based).
+- Before lint, findings is empty. Status: schema **2**, five files, 13
+  symbols, nine refs, two edges, zero runs/findings, `last_run: none`.
+- Recording lint prints one LBC001 finding. `findings --rule LBC001` returns
+  it with `path: examples/data/sample.c`. Status then has six files, one run
+  and one finding; last_run includes the recorded command.
+- A repeat with `--new-since last --fail-on-new` reports no new findings and
+  exits 0. Index records syntax facts; lint records findings separately.
 
-## Publication integration
+Names/references are syntax candidates, not cross-file semantic resolution.
+Explicit DB paths make this journey independent of an existing project DB.
 
-After push authorization, main advanced to `eec706f` (JSON rule expansion).
-The documentation conflicts were reconciled to retain all new rules: 11 JSON
-pack rules and ten lmcode demos, including LBJ105 (four fixture findings).
-The concurrent implementation and all its checks were retained unchanged.
-The integrated suite passed **53/53 checks** from a fresh build directory,
-including all ten lmcode violation/clean pairs, before pushing.
+## Examples and feature checks
+
+Source compiler: `compiler.lock` revision
+`8e334dda3bb821f3bc34be42d598259cb231411c`. Its reported `0.2.38` version is
+not comparable to the npm installer's `0.2.449`; the source pin and successful
+fixture compilation establish the tested pairing.
+
+Executed all README CLI table examples on the source-built host, including
+fixture-exported `--lmcode` parse-string and `check` C function metrics.
+Ran all **20 `examples/*.lms`**, `examples/metrics.sh`, `examples/secrets.sh`,
+and the README `lmctl autorun` raw URL with the pinned compiler and built host.
+All exited 0. Scripts: `autofix-report.lms`, `cst-rules.lms`, `detect-error.lms`, `incremental-reparse.lms`, `lint-c.lms`, `lint-go.lms`, `lint-javascript.lms`, `lint-json.lms`, `lint-repo.lms`, `lint-tsx.lms`, `lint-typescript.lms`, `parse-file.lms`, `parse-string.lms`, `pattern-rules.lms`, `query-json.lms`, `report-json.lms`, `report-metadata.lms`, `rule-catalog.lms`, `sarif-report.lms`, `suppress-findings.lms`.
+
+After rebasing onto `f904436`, also ran `build/lmok outline
+tests/fixtures/outline --budget 30`, then indexed that fixture and reran with
+`--db build/journey/outline.db`: both exited 0, with live signatures and DB
+reference counts respectively. The published snapshots do not have this verb.
+
+Ran all **14 `rules/lmcode/*.lms`** via the documented exporter
+and `check`/body dispatcher loop; all exited 0. Findings and `gate=FAIL` in
+demonstration output are not process failures.
+
+Additional assertions on main, release and dist:
+
+- Baseline captured from lint then reused with `--fail-on-new`: exit 0.
+- Native SARIF for the C security demo: one result in valid JSON.
+- Autofix preview, then apply to a scratch copy: bytes match the committed
+  after fixture; repository fixtures remain untouched.
+- Inline `lmok-disable: LBC001`: zero findings; `--no-suppress`: one finding.
+- Secrets JSON pack executes; metrics/dup and all language facts execute.
+
+## Clean gate
+
+The pinned compiler was bootstrapped once and reused through `LMSCRIPT_BIN`.
+Generated `build/` and `third_party/` were moved to ignored scratch backups,
+leaving both absent before `scripts/sync-deps.sh && ./test.sh` (the same clean
+starting state as deleting them). Initial clean gate on `b3a6537`: **PASS: 123 checks**. No skipped checks or relaxed expectations were introduced.
+
+After rebasing onto `f904436`, repeated the full clean dependency sync/build/gate:
+**PASS: 127 checks**, including four new outline checks. Linux static-link
+verification passed. No test count changes were introduced by these docs.
+
+Final base `5440a29` includes the concurrent mainline review fixes and its
+three additional checks. Repeated the full clean sync/build/gate: **PASS: 130
+checks**. Re-ran the README command sequence and outline on that final binary;
+all expected exit codes and feature assertions passed. Preserved the new
+`16-review-mainline-wave.md` memory-index entry.

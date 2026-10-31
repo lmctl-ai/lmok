@@ -1,18 +1,17 @@
 # Purpose and place
 
 lmok repackages tree-sitter as one statically linked, scriptable CLI: the
-upstream C library (v0.27.1, pinned in `deps.lock`) plus the tree-sitter-json
-(commit `254c42a`), tree-sitter-c (commit `b780e47`), tree-sitter-python
-(v0.23.6), tree-sitter-bash (v0.25.1), tree-sitter-go (v0.25.0),
-tree-sitter-javascript (v0.25.0) and tree-sitter-typescript (v0.23.2) grammars
-(same lock) behind `parse`/`query` subcommands and an lmscript lmcode host. Sibling of
+upstream C library (v0.27.1, pinned in `deps.lock`) plus 11 grammars: JSON,
+C, Python, Bash, Java, Go, JavaScript, TypeScript, TSX, lmscript and lmcode.
+The CLI includes parsing, linting, facts and a SQLite knowledge tree, plus an
+lmscript lmcode host. Sibling of
 lmproxy (Squid) and lmcurl (curl); same house conventions: vendored sources
 in git-ignored `third_party/`, per-file SDK hashes in `sdk.lock`, schema
 embedded by `cmake/embed_schema.cmake`.
 
 The tree-sitter core is compiled through its amalgamation `lib/src/lib.c`
 alone (never together with the individual `lib/src/*.c` files); each grammar
-contributes `src/parser.c`, plus `src/scanner.c` for Python and Bash (Go, C and
+contributes `src/parser.c`, plus external scanners where supplied (including Python, Bash, JavaScript, TypeScript and TSX) (Go, C and
 JSON have no external scanner). Upstream feature-test defines `-D_POSIX_C_SOURCE=200112L
 -D_DEFAULT_SOURCE` apply target-wide.
 
@@ -34,8 +33,7 @@ CLI grammars for `--lang go` / `--lang javascript` / `--lang typescript` /
 `ts.parse_typescript`/`ts.query_typescript` or `ts.parse_tsx`/`ts.query_tsx`;
 the existing explicit lmcode surface stays unchanged for this slice. No cursor API yet.
 
-The lmcode-cpp SDK pin (`sdk.lock`) must match the implicit std set of the
-compiler in use. Since v0.2.0 the pin is `d70a12c` (181 standard signatures),
-matching npm `lmscript` >= 0.2.442; the previous pin `ee1f084` (72 signatures)
-matched <= 0.2.440. Sync with
+The lmcode-cpp SDK pin (`sdk.lock`) must match the source compiler selected by
+`compiler.lock`. Bootstrap that compiler as described in the [build instructions](../README.md#build-and-run);
+npm version strings alone do not establish compatibility. SDK updates use
 `LMCODE_CPP=/path/to/lmcode-cpp LMCODE_CPP_REF=<commit> scripts/sync-sdk.sh`.

@@ -1,6 +1,10 @@
 # Tier 3 synthesis: knowledge tree + local DB (Lead's consolidation)
 
-Status: direction set, awaiting owner sign-off on the v0.6.0 spike. Inputs:
+Status (2026-10-31): the storage spike is shipped. `facts`, `index`, `symbols`,
+`refs`, `findings`, `status`, `outline` and `lint --db` work on current main; facts/parser
+coverage is 11 languages. `find`, trigram search and the `ts.db_*`
+builtins below remain proposals. See the [verified journey](../user-journey-review.md).
+The rest of this document records the original architecture and phasing. Inputs:
 `deep-analysis.md` (Fable), `local-index-survey.md` (Astra1), `db-design.md`
 (Kimi2). Owner framing: NOT SonarQube parity; half exact knowledge tree, half
 search; local DB for storage/retrieval; local-first, CLI-first, no server.

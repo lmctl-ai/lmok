@@ -1,6 +1,6 @@
 # Tier 3 — deep analysis for lmok: stack graphs, CST facts, incremental indexes
 
-Status: design exploration, 2026-10-28. **E6 (facts pass, §4/§5.4 items 1+3) landed for all four languages as `lmok facts` — see README "Facts" and `cpp/facts.hpp`; E7/E8 open; [E9 outline](outline.md) landed.** Author: Fable (lmok team). Scope:
+Status: design exploration, 2026-10-28. **E6 (facts pass, §4/§5.4 items 1+3) landed for the original four languages and now covers all 11 as `lmok facts` — see README "Facts" and `cpp/facts.hpp`; E7/E8 open; [E9 outline](outline.md) landed.** Author: Fable (lmok team). Scope:
 what lmok (binary `lmok`, tree-sitter 0.27.1 + JSON/C/Python/Bash) can
 extract *efficiently* that approximates deep semantic knowledge for an
 AI-driven CLI — half exact knowledge tree, half search. Not a plan for

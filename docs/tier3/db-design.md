@@ -306,7 +306,7 @@ naming the fix ("run `lmok index` first"), exit 3.
    source list, `-DSQLITE_ENABLE_FTS5`), static link verified (`ldd` clean
    stays a test.sh check).
 2. `index` + `.lmok/` resolution + `--db`: files/symbols/refs/edges for all
-   four languages via embedded extraction-query tables.
+   11 current languages via embedded extraction-query tables (the original spike covered four).
 3. `symbols`, `refs`, `findings`, `status` read verbs.
 4. `lint --db` with run rows + supersession.
 5. test.sh: byte-exact checks on a small fixture tree (index → symbols →

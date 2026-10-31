@@ -78,15 +78,22 @@ the direct analog of esquery selectors and `nodesToVisit()` combined.
   `ts.report` arguments or a companion catalog. Entry names are callable
   identities, annotations are node-kind subscriptions. Body locals cannot be
   captured by rules; outer LMScript values can be inserted with `${...}` at
-  compile time. Suppression remains script-owned policy.
+  compile time. Host-side inline suppression is available; see the current README.
 - **Testing**: the existing examples convention (`# expect:` / `#|` header
   lines, inline positive/negative fixtures) is exactly sonar-text's
   inline-examples model.
 
 ### Runnable rule (JSON grammar)
 
-Compile from a directory containing `build/` with the local host on PATH, then
-run `lmok check build/lmb001.dslb config.json`:
+After the [source setup](../README.md#build-and-run), save the following as
+`build/lmb001.lms`. Export this entry fixture and dispatch it from the repo root:
+
+```sh
+node scripts/compile-fixture.mjs build/lmb001.lms build/lmb001.dslb
+build/lmok check --lang json build/lmb001.dslb examples/data/sample.json
+```
+
+The maintainer exporter requires the bootstrapped `LMSCRIPT_BIN`.
 
 ```lmscript
 p = _lmcode_ cli="lmok";
@@ -97,7 +104,8 @@ fn no_password(n: Node) -> void implements Rule {
   }
 }
 end _lmcode_
-savedsl(p, "build/lmb001.dslb");
+r = run_lmcode(p);
+assert(r.ok, "host failed");
 ```
 
 The host walks once and supplies matching nodes. Finding IDs remain the explicit
@@ -108,5 +116,5 @@ with `--lmcode`, including scripts that build SARIF files from `ts.report_json()
 
 - No quality profiles / severity matrix — the snippet is the policy.
 - No semantic resolution, CFG, or symbolic execution.
-- No fix-it/quick-fix emission (tree-sitter keeps full text ranges, so
-  suggestion payloads are possible later).
+- The original v1 excluded fixes; current main supports guarded whole-node
+  autofixes through `ts.report_fix` and JSON packs (see the README).

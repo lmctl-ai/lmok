@@ -6,6 +6,15 @@ what information they need; the tier decides when (or whether) they ship.
 See the [rule library and run commands](../rules/README.md) and
 [examples](../examples/README.md) for runnable entry points.
 
+Current main supports **11 languages**, with **15 JSON packs (100 entries)**
+and **14 lmcode programs**. The [complete pack table](../rules/README.md#pack-inventory)
+includes C, JSON, Python, Bash, Java, Go, JavaScript, TypeScript, TSX, secrets
+and autofix packs. lmscript/lmcode currently have syntax and facts support
+without dedicated shipped JSON packs. The detailed C/JSON/Python/Bash tables
+below retain the original tier inventory; they are not the full pack list.
+Tier 3 now also includes the shipped local DB/knowledge-tree verbs; type
+inference, CFG/dataflow and taint remain deferred.
+
 ## The membership test
 
 **What information does the rule need?**
