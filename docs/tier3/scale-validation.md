@@ -325,3 +325,58 @@ reported corpus. Open performance findings: slow cold indexing, oversized mixed
 DB, regressed warm indexing, and incomplete 50,000-file trials. Deep Python
 remains explicitly error-tolerant and only partially extracted. These limits
 are not hidden behind a successful small-fixture gate.
+
+## Follow-up: warm extraction-state lookup (2026-10-31)
+
+Fixed in **`7ec96f6`** (baseline **`5da175e`**). The correctness check remains:
+`lint --db` placeholder rows must still be extracted, including files that
+produce no symbols. The correlated FTS path scan is replaced by:
+
+```sql
+SELECT f.id, f.path, f.sha256, f.mtime, f.size,
+       f.path IN (SELECT path FROM file_text)
+FROM files f;
+```
+
+SQLite materializes the uncorrelated path membership set once and probes it
+for each file, rather than rescanning FTS for every files row. No schema,
+column, persistent index, or migration is added: **schema_version stays 2**.
+Existing DBs benefit immediately; extraction and stat/hash invalidation rules
+are unchanged. Cold per-file FTS deletes and edge resolution are outside this
+fix, so the earlier cold-index and size findings remain open.
+
+Astra1 copied Astra3's retained `corpora/mixed` with `shutil.copytree` (preserving
+file timestamps) into `build-warm/mixed`, then built a **fresh DB** with the
+baseline binary. The copy contains 2,533 files / 77,477,363 bytes including the
+original whitespace edits and unrecognized `.mjs`/`.cjs` files. Indexing selected
+exactly **2,327 files**. The same source paths and DB were used for all six warm
+runs without edits, `--force`, or DB replacement. Baseline cold indexing took
+180.057 seconds; this is setup, not a cold-performance comparison.
+
+| Binary | Warm run 1 s | Warm run 2 s | Warm run 3 s | Median s |
+| --- | ---: | ---: | ---: | ---: |
+| `5da175e`, `build-warm/lmok-before` | 21.172 | 21.538 | 21.007 | 21.172 |
+| `7ec96f6`, clean Release `build/lmok` | 0.354 | 0.351 | 0.353 | 0.353 |
+
+Every warm run exited 0 with empty stderr and exactly
+`indexed 0 files (2327 unchanged, 0 removed)`. `PRAGMA quick_check` returned
+`ok` after both groups. The median improvement is about **60×**, meeting the
+~2-second warm target on this corpus. Measurements use Python `perf_counter`
+around separate CLI subprocesses with captured output and a 600-second timeout.
+This is the same shared ARM development host; the clean gate/build overlapped
+baseline measurements, so these are not isolated-machine throughput guarantees.
+Raw harness and JSONL timings remain in ignored `build-warm/`.
+
+Binary SHA-256 identifiers:
+
+- Before: `a5449a532d54c916bf31dc79527b53d4585f88c7f11aa32f54ee60b057106fc6`.
+- After: `766b67eb95053fdfe087c93ba187bb227876db358826418918fbc0c9d96da4a5`.
+
+The full gate after deleting `build/` and `third_party/` passed **132 checks**
+(+1); `ldd build/lmok` reports `not a dynamic executable`. The new deterministic
+regression runs `EXPLAIN QUERY PLAN` on the **same SQL constant used by index**
+with pinned SQLite 3.54.1: it requires an uncorrelated list subquery with one
+FTS scan, and rejects the old correlated query as a negative control. It also
+checks placeholder, empty-extraction, duplicate-path and NULL-path behavior.
+The existing lint-before-index and subsecond-invalidation regressions pass.
+No wall-clock assertion was added to CI.
