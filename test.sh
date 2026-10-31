@@ -22,7 +22,16 @@ ok(){ pass=$((pass+1)); echo "ok $pass - $1"; }
 fail(){ echo "FAIL: $*" >&2; exit 1; }
 
 LMSCRIPT="$(scripts/select-compiler.sh)"
+export LMSCRIPT_BIN="$LMSCRIPT"
 compile_fixture(){ node scripts/compile-fixture.mjs "$@"; }
+# Fixture compilation imports the compiler library (dist/dsl.js) next to the compiler
+# binary; upstream removed the public bytecode export, and the npm CLI package does not
+# ship the library. Require it and point at the bootstrap when only the CLI is installed.
+_lms_real="$(node -p 'require("fs").realpathSync(process.argv[1])' "$LMSCRIPT")"
+if [ -n "${LMCODE_COMPILER_MODULE:-}" ]; then _libcheck="$LMCODE_COMPILER_MODULE";
+else _libcheck="$(dirname "$_lms_real")/../dist/dsl.js"; fi
+[ -f "$_libcheck" ] || { echo "error: lmscript compiler library not found at $_libcheck" >&2;
+  echo "run scripts/bootstrap-compiler.sh and set LMSCRIPT_BIN to the path it prints" >&2; exit 2; }
 scripts/sync-sdk.sh --verify >/dev/null || fail "SDK header pin mismatch"
 ok "SDK headers match sdk.lock"
 scripts/sync-deps.sh --verify >/dev/null || fail "deps pin mismatch"
@@ -944,19 +953,19 @@ PY_UTF8
 ok "robustness: invalid UTF-8 replaced in JSON findings; valid UTF-8 preserved (exact bytes)"
 
 
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-entries.py "$HOST" || fail "v6 entry dispatch controls"
+python3 tests/check-entries.py "$HOST" || fail "v6 entry dispatch controls"
 ok "v6 entries: kind dispatch, source order, anonymous nodes, per-file state and refusals"
 python3 tests/check-script-scanners.py || fail "script grammar scanner link controls"
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-script-languages.py "$HOST" --prove-controls || fail "lmscript/lmcode grammar and facts oracles"
+python3 tests/check-script-languages.py "$HOST" --prove-controls || fail "lmscript/lmcode grammar and facts oracles"
 ok "lmscript/lmcode parse, query, lint, facts and native output controls"
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-java-os.py "$HOST" --prove-controls || fail "Java native OS oracles"
+python3 tests/check-java-os.py "$HOST" --prove-controls || fail "Java native OS oracles"
 ok "Java grammar, facts, tier-1 rules and annotated checks on native OS"
 
 python3 tests/check-native-os.py "$HOST" --prove-controls || fail "native OS contracts"
 python3 tests/check-patterns.py "$HOST" || fail "pattern compiler cases"
 ok "patterns: code-shaped patterns compile to pinned queries; root matches and exit-2 diagnostics byte-exact"
 ok "native OS byte/path/linkage contracts and negative controls"
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-rules-os.py "$HOST" --prove-controls || fail "rule pack OS oracles"
+python3 tests/check-rules-os.py "$HOST" --prove-controls || fail "rule pack OS oracles"
 ok "rule packs per OS: all twelve converted packs, CRLF/no-newline/unicode fixtures, anonymous kinds, argument order"
 # --- SQLite DB layer (keep additive checks at the end) ---
 cmake --build "$BUILD_DIR" --target lmok_db_test -j2 >"$WORK/db-build.log" 2>&1 ||
@@ -1206,13 +1215,13 @@ set +e; out="$(cd "$DBFIX" && "$HOST_ABS" symbols --lang rust --db "$WORK/test.d
 [ "$code" = 2 ] && [[ "$out" == *"unknown language 'rust'"* ]] || fail "symbols unknown --lang (exit $code): $out"
 ok "index: edges resolve (include hits ./util.h, import os external); missing DB refused (exit 2)"
 
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-project.py "$HOST" || fail "project CI and suppression"
+python3 tests/check-project.py "$HOST" || fail "project CI and suppression"
 ok "project CI, ignores and host suppression"
 
 python3 tests/check-ci-planted.py "$HOST" || fail "planted CI finding"
 ok "lmok ci planted-finding gate"
 
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-rule-contracts.py "$HOST" || fail "rule metadata and annotated pack harness"
+python3 tests/check-rule-contracts.py "$HOST" || fail "rule metadata and annotated pack harness"
 ok "rule metadata and annotated pack harness"
 "$HOST" test rules/c-tier1.json tests/fixtures/c-tier1-annotated.c || fail "annotated C pack"
 "$HOST" test rules/python-tier1.json tests/fixtures/python-tier1-annotated.py || fail "annotated Python pack"
@@ -1228,23 +1237,23 @@ ok "annotated C/Python fixture pairs and self-test example"
 
 python3 tests/check-secrets.py "$HOST" || fail "secrets packs and entropy"
 ok "secrets packs, redaction, entropy and false positive controls"
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-autofix.py "$HOST" --prove-controls || fail "token-safe autofix native OS contracts"
+python3 tests/check-autofix.py "$HOST" --prove-controls || fail "token-safe autofix native OS contracts"
 ok "token-safe autofix, previews, suppression, rollback and pinned bytes"
 
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-metrics.py "$HOST" || fail "metrics and cognitive complexity"
+python3 tests/check-metrics.py "$HOST" || fail "metrics and cognitive complexity"
 ok "C/Python ten-function cognitive and nesting table"
 python3 tests/check-dup.py "$HOST" || fail "normalized token duplication"
 ok "token duplication ranges, normalization and controls"
 
 # --- baseline / new-code-only + host SARIF (roadmap wave 1) ---
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-baseline-sarif.py "$HOST" || fail "baseline/new-code and SARIF contracts"
+python3 tests/check-baseline-sarif.py "$HOST" || fail "baseline/new-code and SARIF contracts"
 ok "baseline: --new-since/--baseline/--changed/--fail-on-new keying (moved finding stays baseline), controls proven; SARIF: lint/check/ci"
 
 python3 tests/check-review-security.py "$HOST" || fail "review credential boundaries"
 ok "review credential previews, Java storage, safe baseline rotation and diff flags"
 python3 tests/check-review-baseline.py "$HOST" || fail "review baseline snapshots and Git filenames"
 ok "review baseline snapshots and Git filenames"
-LMSCRIPT_BIN="$LMSCRIPT" python3 tests/check-review-sarif.py "$HOST" || fail "review SARIF Unicode and URIs"
+python3 tests/check-review-sarif.py "$HOST" || fail "review SARIF Unicode and URIs"
 ok "review SARIF Unicode and URIs"
 
 echo "PASS: $pass checks"

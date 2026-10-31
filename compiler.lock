@@ -1,0 +1,5 @@
+# lmctl-mono commit the lmscript compiler workspace is built from
+# (scripts/bootstrap-compiler.sh). The published npm CLI does not ship the
+# compiler library (dist/dsl.js) that fixture compilation imports; the
+# library only exists in a source build. Bump deliberately.
+8e334dda3bb821f3bc34be42d598259cb231411c
