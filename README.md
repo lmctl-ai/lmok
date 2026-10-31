@@ -81,10 +81,10 @@ main's pinned compiler and scripts; installing the latest release alone is
 not a substitute. The native parsing, linting and DB journeys were verified on both snapshots.
 
 With npm lmscript installed (the installer below was checked with
-`@lmctl-ai/lmctl@0.2.449`):
+`@lmctl-ai/lmctl@0.2.450`):
 
 ```sh
-npm install -g @lmctl-ai/lmctl@0.2.449
+npm install -g @lmctl-ai/lmctl@0.2.450
 lmscript install github:lmctl-ai/lmok@latest
 ```
 
