@@ -1304,4 +1304,9 @@ assert defs(f'{work}/imports.java') == ['List'], defs(f'{work}/imports.java')
 PY_IMPORTS
 ok "facts: import bindings — JS/TS/TSX aliased specifiers bind the alias only; Java wildcard imports bind no name"
 
+# Deterministic plan check against the exact query used by index (no wall-time bound).
+out="$("$BUILD_DIR/lmok_db_test" "$WORK/index-plan.db" --index-plan)" || fail "index extraction lookup plan"
+[ "$out" = "index lookup: one uncorrelated FTS scan, placeholder/empty/duplicate controls" ] || fail "index plan output: $out"
+ok "index extraction lookup materializes FTS paths once; old correlated plan rejected"
+
 echo "PASS: $pass checks"

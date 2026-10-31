@@ -65,6 +65,12 @@ public:
   void commit();
 };
 
+// Shared with the query-plan regression. FTS path is UNINDEXED: materialize
+// its membership set once instead of correlating a full scan for every file.
+inline constexpr const char *index_files_sql =
+    "SELECT f.id, f.path, f.sha256, f.mtime, f.size,"
+    " f.path IN (SELECT path FROM file_text) FROM files f";
+
 // Stable text report from one read transaction (no torn row-count snapshots).
 std::string db_status(Database &db, const std::filesystem::path &path);
 

@@ -6,8 +6,41 @@
 static void require(bool value) { if (!value) throw std::runtime_error("DB wrapper assertion failed"); }
 int main(int argc, char **argv) {
   try {
-    require(argc == 2);
+    require(argc == 2 || (argc == 3 && std::string(argv[2]) == "--index-plan"));
     lmok::Database db(std::filesystem::u8path(argv[1]), lmok::Database::Mode::Create);
+    if (argc == 3) {
+      auto materialized_once = [&](const std::string &sql) {
+        auto plan = db.prepare("EXPLAIN QUERY PLAN " + sql);
+        bool list = false;
+        int fts_scans = 0;
+        while (plan.step()) {
+          const auto detail = plan.text(3);
+          if (detail.find("CORRELATED") != std::string::npos) return false;
+          if (detail.find("LIST SUBQUERY") != std::string::npos) list = true;
+          if (detail.find("VIRTUAL TABLE INDEX") != std::string::npos) ++fts_scans;
+        }
+        return list && fts_scans == 1;
+      };
+      require(materialized_once(lmok::index_files_sql));
+      // Negative control: the former quadratic query must fail the plan oracle.
+      require(!materialized_once("SELECT f.id, EXISTS(SELECT 1 FROM file_text t WHERE t.path=f.path) FROM files f"));
+      db.exec("INSERT INTO files VALUES(1,'empty.c','c','hash',0,0,1),"
+              "(2,'placeholder.c','c','hash',0,0,1),"
+              "(3,'duplicate.c','c','hash',0,0,1)");
+      db.exec("INSERT INTO file_text(path,lang,text) VALUES"
+              "('empty.c','c',''),('duplicate.c','c','x'),('duplicate.c','c','y'),(NULL,'c','orphan')");
+      auto rows = db.prepare(lmok::index_files_sql);
+      int count = 0;
+      while (rows.step()) {
+        const auto id = rows.integer(0);
+        require(id >= 1 && id <= 3);
+        require((rows.integer(5) != 0) == (id != 2));
+        ++count;
+      }
+      require(count == 3); // duplicates in FTS must not duplicate files rows
+      std::cout << "index lookup: one uncorrelated FTS scan, placeholder/empty/duplicate controls\n";
+      return 0;
+    }
     try {
       lmok::Transaction rollback(db);
       db.exec("INSERT INTO runs VALUES(1,1,'rolled back')");

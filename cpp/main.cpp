@@ -740,8 +740,7 @@ static int run_cli(int argc, char **argv) {
       struct FileRow { int64_t id; std::string sha256; int64_t mtime; int64_t size; bool extracted; };
       std::map<std::string, FileRow> known;
       {
-        auto q = db.prepare("SELECT f.id, f.path, f.sha256, f.mtime, f.size,"
-                            " EXISTS(SELECT 1 FROM file_text t WHERE t.path = f.path) FROM files f");
+        auto q = db.prepare(lmok::index_files_sql);
         while (q.step())
           known.emplace(q.text(1), FileRow{q.integer(0), q.text(2), q.integer(3), q.integer(4), q.integer(5) != 0});
       }
