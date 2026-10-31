@@ -6,8 +6,8 @@ scriptable CLI.
 lmok embeds [tree-sitter](https://tree-sitter.github.io) 0.27.1 and **11
 languages**: JSON, C, Python, Bash, Java, Go, JavaScript, TypeScript, TSX,
 lmscript and lmcode. The last two are syntax-analysis grammars; embedded
-lmcode bodies in `.lms` files remain opaque. No Node runtime is needed to
-run the standalone binary.
+lmcode bodies in `.lms` files are parsed separately with absolute source positions.
+No Node runtime is needed to run the standalone binary.
 
 - Parse/query source, extract facts, measure local metrics and token duplication.
 - Lint with **15 JSON packs (100 rule entries)** and **15 lmcode rule programs**;
@@ -22,6 +22,12 @@ run the standalone binary.
 These are syntax checks and candidate references, not type inference or taint
 analysis. The CLI below describes current main; published artifacts are
 identified separately under [install](#published-host-and-raw-urls).
+
+Embedded analysis: `lmok facts workflow.lms` includes outer and inner facts.
+`lmok query --lang lmcode '(function_declaration (identifier) @name)' workflow.lms`
+and `lmok check --lang lmcode rules.dslb workflow.lms` select the inner bodies.
+Lmcode JSON packs also apply inside `.lms` files through lint/ci/test. Outer parse
+and lmscript queries remain outer-only. See [injection and byte coordinates](durable-memory/15-script-languages.md).
 
 ## Build and run
 
@@ -43,21 +49,24 @@ build/lmok parse examples/data/sample.json
 ```
 
 The standalone host build above needs no compiler checkout or Node runtime.
-**Scripting and the full test gate currently require Git access to the private
-`lmctlhq/lmctl-mono` repository.** With that access configured:
+Scripting and the full gate need the compiler library, not only a compiler binary.
+CI pins the published `@lmctl-ai/lmctl@0.2.451`, which ships `dist/dsl.js`.
+A private installation keeps the machine's global compiler unchanged:
 
 ```sh
-export LMSCRIPT_BIN="$(scripts/bootstrap-compiler.sh)"
-export PATH="$(dirname "$LMSCRIPT_BIN"):$PWD/build:$PATH"
+npm install --prefix /tmp/lmok-compiler @lmctl-ai/lmctl@0.2.451
+export LMSCRIPT_BIN=/tmp/lmok-compiler/node_modules/.bin/lmscript
+export LMCODE_COMPILER_MODULE=/tmp/lmok-compiler/node_modules/@lmctl-ai/lmctl/dist/dsl.js
 ./test.sh
-"$LMSCRIPT_BIN" examples/parse-string.lms
 ```
+
+Alternatively, with Git access to the private mono repository, use
+`scripts/bootstrap-compiler.sh` for the exact source pin in `compiler.lock`.
 
 Run repository examples from this directory. Bootstrap builds the exact
 `compiler.lock` source revision once and caches it outside `build/`; reuse
-`LMSCRIPT_BIN` in this shell. The npm-only lmscript package lacks the compiler
-library needed by fixture export and cannot run the full gate. Compiler
-version strings alone do not establish compatibility. No sibling SDK checkout
+`LMSCRIPT_BIN` in this shell. Older npm packages lack the compiler library; the gate checks its presence.
+Compiler version strings alone do not establish compatibility. No sibling SDK checkout
 is needed: its headers are already vendored.
 
 Produces `build/lmok`; `ldd build/lmok` reports "not a dynamic executable" on
