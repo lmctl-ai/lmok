@@ -24,14 +24,23 @@ fail(){ echo "FAIL: $*" >&2; exit 1; }
 LMSCRIPT="$(scripts/select-compiler.sh)"
 export LMSCRIPT_BIN="$LMSCRIPT"
 compile_fixture(){ node scripts/compile-fixture.mjs "$@"; }
-# Fixture compilation imports the compiler library (dist/dsl.js) next to the compiler
-# binary; upstream removed the public bytecode export, and the npm CLI package does not
-# ship the library. Require it and point at the bootstrap when only the CLI is installed.
+# Fixture compilation imports the compiler library (dist/dsl.js). The npm
+# package ships it, but the bin layout differs by platform: Unix npm globals
+# symlink bin/lmscript into the package, while the Windows shim is a plain
+# file in the prefix root. Resolve through the known layouts and hand the
+# result to compile-fixture.mjs via LMCODE_COMPILER_MODULE.
 _lms_real="$(node -p 'require("fs").realpathSync(process.argv[1])' "$LMSCRIPT")"
 if [ -n "${LMCODE_COMPILER_MODULE:-}" ]; then _libcheck="$LMCODE_COMPILER_MODULE";
-else _libcheck="$(dirname "$_lms_real")/../dist/dsl.js"; fi
-[ -f "$_libcheck" ] || { echo "error: lmscript compiler library not found at $_libcheck" >&2;
-  echo "run scripts/bootstrap-compiler.sh and set LMSCRIPT_BIN to the path it prints" >&2; exit 2; }
+else
+  _lms_dir="$(dirname "$_lms_real")"
+  _libcheck=""
+  for _d in "$_lms_dir/../dist" "$_lms_dir/../lib/node_modules/@lmctl-ai/lmctl/dist" "$_lms_dir/node_modules/@lmctl-ai/lmctl/dist"; do
+    [ -f "$_d/dsl.js" ] && { _libcheck="$_d/dsl.js"; break; }
+  done
+  [ -n "$_libcheck" ] && export LMCODE_COMPILER_MODULE="$_libcheck"
+fi
+[ -n "$_libcheck" ] && [ -f "$_libcheck" ] || { echo "error: lmscript compiler library (dist/dsl.js) not found near $LMSCRIPT" >&2;
+  echo "install @lmctl-ai/lmctl >= 0.2.451 or run scripts/bootstrap-compiler.sh and set LMSCRIPT_BIN to the path it prints" >&2; exit 2; }
 scripts/sync-sdk.sh --verify >/dev/null || fail "SDK header pin mismatch"
 ok "SDK headers match sdk.lock"
 scripts/sync-deps.sh --verify >/dev/null || fail "deps pin mismatch"
