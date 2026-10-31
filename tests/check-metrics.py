@@ -45,9 +45,8 @@ with tempfile.TemporaryDirectory(prefix='metrics os ',dir=ROOT/'build') as tmp:
             source = pack.replace('cli="lmok"','schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json')))
             source = source.replace('score > 15', threshold)
             if zero: source = source.replace('let score = cognitive_score(n);','let score = 0;')
-            source = re.sub(r'savedsl\(p, .*?\);', 'savedsl(p, ARGV[0]);', source)
             path = tmp/'rule.lms'; binary=tmp/'rule.dslb'; path.write_text(source)
-            result = subprocess.run([COMPILER,str(path),str(binary)],capture_output=True,timeout=60)
+            result = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"),str(path),str(binary)],capture_output=True,timeout=60)
             assert result.returncode == 0,(result.stdout,result.stderr)
             return binary
         def function(name, body):

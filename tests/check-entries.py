@@ -35,8 +35,8 @@ class EntryChecks(unittest.TestCase):
     def compile(self, body):
         src = self.work / 'rules.lms'
         binary = self.work / 'rules.dslb'
-        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\nsavedsl(p, ARGV[0]);\n')
-        r = subprocess.run([*compiler_argv(), str(src), str(binary)], capture_output=True, text=True)
+        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\n')
+        r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(src), str(binary)], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         return binary
     def run_host(self, binary, *files, lang='json'):
@@ -69,7 +69,7 @@ class EntryChecks(unittest.TestCase):
         binary = self.compile('@pair fn bad(n: Node) -> void implements Rule { n.child(999); }')
         r = self.run_host(binary)
         self.assertEqual(r.returncode,3,r.stdout+r.stderr)
-        error = json.loads(r.stdout.splitlines()[-1])
+        error = json.loads(r.stdout.splitlines()[-2])
         self.assertEqual(error['phase'],'run')
         self.assertIn('out of range',error['message'])
         self.assertGreater(error['line'],0)
@@ -79,7 +79,7 @@ class EntryChecks(unittest.TestCase):
         b=bytearray(binary.read_bytes()); b[4:6]=b'\0\5'; binary.write_bytes(b)
         r=self.run_host(binary)
         self.assertEqual(r.returncode,3,r.stdout+r.stderr)
-        error=json.loads(r.stdout)
+        error=json.loads(r.stdout.splitlines()[-2])
         self.assertEqual(error['code'],'LOAD_BAD_BYTECODE')
         self.assertIn('unsupported bytecode version 5',error['message'])
     def test_duplicate_entry_names_refused(self):
@@ -101,7 +101,7 @@ class EntryChecks(unittest.TestCase):
         p+=14;region();b[p:p+4]=b[first:first+4];binary.write_bytes(b)
         r=self.run_host(binary)
         self.assertEqual(r.returncode,3,r.stdout+r.stderr)
-        self.assertIn("duplicate entry name 'first'",json.loads(r.stdout)['message'])
+        self.assertIn("duplicate entry name 'first'",json.loads(r.stdout.splitlines()[-2])['message'])
     def test_parent_chains_do_not_exhaust_node_handles(self):
         # WP14 F4: a rule walking n.parent() for every array used to allocate depth^2 handles; depth 5000 hit the 1<<20 cap.
         self.source.write_text('[' * 5000 + ']' * 5000)
@@ -119,14 +119,14 @@ class EntryChecks(unittest.TestCase):
         binary = self.compile('@typo_kind_that_does_not_exist fn t(n: Node) -> void implements Rule { ts.report(n, "typo"); }')
         r = self.run_host(binary)
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
-        error = json.loads(r.stdout)
+        error = json.loads(r.stdout.splitlines()[-2])
         self.assertEqual((error['phase'], error['code']), ('load', 'LOAD_UNBOUND'))
         self.assertIn("annotation '@typo_kind_that_does_not_exist' is not a node kind of the json grammar", error['message'])
         self.source.write_text('int f(void) { return 1; }')
         binary = self.compile('@expression fn abstract(n: Node) -> void implements Rule { ts.report(n, "never"); }')
         r = self.run_host(binary, lang='c')
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
-        self.assertIn("'@expression' is a supertype of the c grammar", json.loads(r.stdout)['message'])
+        self.assertIn("'@expression' is a supertype of the c grammar", json.loads(r.stdout.splitlines()[-2])['message'])
         # Concrete kinds keep working: the ERROR kind, an anonymous token and a named node.
         self.source.write_text('{"a" 1}')
         binary = self.compile('@ERROR fn e(n: Node) -> void implements Rule { ts.report(n, "error", "E", "major"); }\n@document fn d(n: Node) -> void implements Rule { ts.report(n, "doc", "D", "info"); }')
@@ -157,8 +157,8 @@ class EntryChecks(unittest.TestCase):
         lines = r.stdout.splitlines()
         self.assertEqual([f['rule'] for f in json.loads(lines[0])], ['F1', 'F1'])
         self.assertEqual(lines[1], '2 findings in ' + self.source.as_posix())
-        error = json.loads(lines[2]); self.assertEqual(error['phase'], 'run'); self.assertIn('out of range', error['message'])
-        self.assertEqual(len(lines), 3, 'the second input is not processed after an error')
+        error = json.loads(lines[3]); self.assertEqual(error['phase'], 'run'); self.assertIn('out of range', error['message'])
+        self.assertEqual(len(lines), 5, 'the second input is not processed after an error')
     def test_missing_input_and_bad_usage(self):
         binary=self.compile('@pair fn first(n: Node) -> void implements Rule {}')
         r=self.run_host(binary,self.work/'missing.json')

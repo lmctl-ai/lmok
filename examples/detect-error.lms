@@ -7,7 +7,7 @@
 # expect:
 #|malformed input detected
 #|(document (object (pair key: (string (string_content)) value: (number)) (ERROR)))
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 
 let tree = ts.parse("{\"a\": 1,,}");
 
@@ -19,5 +19,7 @@ if (tree.has_error()) {
 }
 println(tree.sexp());
 
-end _dsl_
-savedsl(p, "build/detect-error.dslb");
+end _lmcode_
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

@@ -22,4 +22,6 @@ fn function_too_long(n: Node) -> void implements Rule {
 }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/python-function-metrics.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

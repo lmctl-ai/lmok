@@ -9,7 +9,7 @@
 #|(document (object (pair key: (string (string_content)) value: (string (string_content))) (pair key: (string (string_content)) value: (array (string (string_content)) (string (string_content))))))
 #|has_error -> false
 #|nodes -> 34
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 
 let text = "{\"name\": \"lmok\", \"tags\": [\"tree-sitter\", \"json\"]}";
 let tree = ts.parse(text);
@@ -19,5 +19,7 @@ println(tree.sexp());
 println("has_error -> " + str(tree.has_error()));
 println("nodes -> " + str(tree.node_count()));
 
-end _dsl_
-savedsl(p, "build/parse-string.dslb");
+end _lmcode_
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

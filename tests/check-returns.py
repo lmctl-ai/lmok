@@ -52,7 +52,7 @@ class ReturnChecks(unittest.TestCase):
         source.write_text(
             'p = _lmcode_ schema=' + json.dumps(str(ROOT / "schema/lmok.dsl.json")) + ";\n"
             + body + "\nend _lmcode_\n"
-            + "savedsl(p, ARGV[0]);\n",
+            + "",
             encoding="utf-8", newline="\n",
         )
         result = subprocess.run(["node", str(ROOT/"scripts/compile-fixture.mjs"), str(source), str(bytecode)], capture_output=True, text=True)

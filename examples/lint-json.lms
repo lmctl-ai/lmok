@@ -85,4 +85,6 @@ for (n in tree.nodes()) {
 println(str(found) + " findings");
 
 end _lmcode_
-savedsl(p, "build/lint-json.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

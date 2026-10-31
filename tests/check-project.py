@@ -33,8 +33,8 @@ class ProjectTests(unittest.TestCase):
         obj={'version':1,'packs':{'c':['pack.json']},'severity_floor':'major','fail_on':'findings'};obj.update(kw)
         self.source('.lmok/config.json',json.dumps(obj));return obj
     def compile(self):
-        p=self.source('entry.lms','p=_lmcode_ schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json'))+';\n@identifier fn ids(n: Node) -> void implements Rule { ts.report(n,"id","A","major"); }\nend _lmcode_\nsavedsl(p,ARGV[0]);\n');out=self.root/'rule.dslb'
-        r=subprocess.run([compiler(),str(p),str(out)],capture_output=True,timeout=30);self.assertEqual(r.returncode,0,r.stderr);return out
+        p=self.source('entry.lms','p=_lmcode_ schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json'))+';\n@identifier fn ids(n: Node) -> void implements Rule { ts.report(n,"id","A","major"); }\nend _lmcode_\n');out=self.root/'rule.dslb'
+        r=subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"),str(p),str(out)],capture_output=True,timeout=30);self.assertEqual(r.returncode,0,r.stderr);return out
     def test_inline_selective_previous_line_crlf_and_override(self):
         p=self.source('x.c','int a; // lmok-disable: A\r\nint b;\r\n// lmok-disable\r\nint c;\r\nint d;\r\n')
         r=self.run_host('lint',self.pack,p);found=self.findings(r)

@@ -1,9 +1,6 @@
 // description: Run the JavaScript tier-1 pack over its violation fixture.
 //|javascript-tier1: 4 findings
-p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
-let probe = ts.parse("{}");
-end _lmcode_
 
-let result = system ${dsl_cli(p)} lint rules/javascript-tier1.json tests/fixtures/javascript-tier1-violations.js;
+let result = system(["lmok", "lint", "rules/javascript-tier1.json", "tests/fixtures/javascript-tier1-violations.js"]);
 assert(result.code == 0);
 println("javascript-tier1: " + str(count_matches(result.stdout, "\"rule\":")) + " findings");

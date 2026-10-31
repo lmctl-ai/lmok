@@ -42,4 +42,6 @@ fn no_deep_nesting_for(n: Node) -> void implements Rule { no_deep_nesting(n); }
 fn no_deep_nesting_while(n: Node) -> void implements Rule { no_deep_nesting(n); }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/c-nesting-depth.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

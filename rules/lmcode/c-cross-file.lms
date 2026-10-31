@@ -48,4 +48,6 @@ println(ts.report_json());
 println(str(ts.report_count()) + " findings");
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/c-cross-file.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

@@ -27,4 +27,6 @@ fn check_scanf(call: Node) -> void implements Rule {
 }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/c-scanf-width.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

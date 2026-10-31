@@ -62,8 +62,7 @@ and rule fixtures, including native OS byte/path/linkage checks on every matrix 
 
 ```sh
 lmscript examples/parse-string.lms
-build/lmok --lmcode build/parse-string.dslb
-```
+build/```
 
 The first command saves bytecode; the second prints the JSON text, its tree,
 `has_error -> false`, `nodes -> 34`, then the host's success record
@@ -104,13 +103,12 @@ From the repository root (or an empty directory for this inline-data example):
 ```sh
 mkdir -p build
 lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmok/main/examples/parse-string.lms
-lmok --lmcode build/parse-string.dslb
 ```
 
-With a local build, use `build/lmok` for the second command. The local
+With a local build, put its directory on PATH. The local
 form `lmctl autorun examples/parse-string.lms` works too. `autorun` runs the
-outer script, whose `savedsl` call writes `build/parse-string.dslb`; it does
-not execute that bytecode or print the tree. The `install=` declaration lets
+outer script, which constructs a program and executes it with `run_lmcode`,
+printing the tree and forwarding host diagnostics. The `install=` declaration lets
 lmscript resolve a host when one is not on PATH. `@latest` is not a fixed
 version pin, and initial resolution needs network access.
 
@@ -197,14 +195,16 @@ the existing diagnostics (and after successful SARIF output):
 
 ```text
 LMCODE_RETURN_BEGIN
-null
+{"ok":true,"result":null}
 LMCODE_RETURN_END
 ```
 
-The payload is the invocation's `$return` value, or `null` when unset. Body and
+The envelope's result is the program's `$return` value, or `null` when unset. Body and
 rule-entry writes share the sink across all nodes and input files; `--lmcode`
-continues to run only the body. Each program in a multi-program `--lmcode` command
-gets its own result. Runtime or application failures emit no frame. Finding
+continues to run only the body. Repeated `--lmcode FILE` pairs form one invocation, with add-order results and
+required `parts`. Each program owns its sealed sink; host state is shared.
+`--first FILE` / `--last FILE` roles reorder execution while retaining add order.
+Tagged host_summary diagnostics preserve completed-program/input summaries. Runtime or application failures emit one failure envelope without result/parts. Finding
 IDs, order, suppression and entry HALT values retain their existing meanings.
 The [body/entry return example](examples/invocation-return.lmcode) requires the
 prepared slice 3 compiler until its release. See [invocation ownership and compiler staging](durable-memory/14-invocation-return.md).
@@ -506,17 +506,18 @@ a candidate set, never a resolution.
 ## Scripting
 
 Save this as `build/show.lms` after the setup above, run
-`lmscript build/show.lms`, then `build/lmok --lmcode build/show.dslb`.
-The script saves bytecode; `--lmcode` executes it.
+`PATH=build:$PATH lmscript build/show.lms`.
+The block constructs an opaque program; run_lmcode executes it.
 
 ```lmscript
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let tree = ts.parse("{\"name\": \"lmok\", \"tags\": [\"tree-sitter\", \"json\"]}");
 println(tree.sexp());
 println("has_error -> " + str(tree.has_error()));
 println("nodes -> " + str(tree.node_count()));
-end _dsl_
-savedsl(p, "build/show.dslb");
+end _lmcode_
+r = run_lmcode(p);
+assert(r.ok, "host failed");
 ```
 
 The lmcode surface is deliberately small: `ts.parse(text)` returns a `Tree` with
@@ -762,4 +763,4 @@ See [the grammar contract and S5 seam](durable-memory/15-script-languages.md).
 
 ## Historical literal names
 
-The documentation calls the language lmcode. `--lmcode`, `--lmcode-schema` and `--lmcode-signatures` are current host flag literals; `DSLB` is the bytecode magic and `DSLB v6` is the current format name; `.dslb` is the current bytecode filename extension; `_dsl_` is the historical block spelling. Other code-formatted API names, paths, manifest names and diagnostic text retain their current literal spellings.
+The documentation calls the language lmcode. `--lmcode`, `--lmcode-schema` and `--lmcode-signatures` are current host flag literals; `DSLB` is the bytecode magic and `DSLB v6` is the current format name; `.dslb` is the current bytecode filename extension; `_lmcode_` is the historical block spelling. Other code-formatted API names, paths, manifest names and diagnostic text retain their current literal spellings.

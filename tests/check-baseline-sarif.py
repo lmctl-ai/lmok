@@ -330,8 +330,8 @@ class Baseline(unittest.TestCase):
             'p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n'
             'ts.report(ts.parse_c("int body;").root(), "body finding", "B001", "major");\n'
             '@comment fn fixme(n: Node) -> void implements Rule { ts.report(n, "FIXME left", "X001", "minor"); }\n'
-            'end _lmcode_\nsavedsl(p, ARGV[0]);\n')
-        compiled = subprocess.run([*compiler_argv(), str(source), str(binary)], capture_output=True, text=True)
+            'end _lmcode_\n')
+        compiled = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(source), str(binary)], capture_output=True, text=True)
         self.assertEqual(compiled.returncode, 0, compiled.stderr)
         target = self.repo / 'input.c'
         target.write_bytes(b'// FIXME: later\nint x;\n')

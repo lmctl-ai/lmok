@@ -1,9 +1,6 @@
 // description: Run the TypeScript tier-1 pack over its violation fixture.
 //|typescript-tier1: 3 findings
-p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
-let probe = ts.parse("{}");
-end _lmcode_
 
-let result = system ${dsl_cli(p)} lint rules/typescript-tier1.json tests/fixtures/typescript-tier1-violations.ts;
+let result = system(["lmok", "lint", "rules/typescript-tier1.json", "tests/fixtures/typescript-tier1-violations.ts"]);
 assert(result.code == 0);
 println("typescript-tier1: " + str(count_matches(result.stdout, "\"rule\":")) + " findings");

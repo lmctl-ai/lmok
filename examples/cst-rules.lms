@@ -69,4 +69,6 @@ for (a in range(0, r.child_count())) {
 }
 
 end _lmcode_
-savedsl(p, "build/cst-rules.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

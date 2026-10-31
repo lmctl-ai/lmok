@@ -58,8 +58,8 @@ class RulePacksOS(unittest.TestCase):
     def compile(self, body):
         src = self.work / 'rule.lms'
         binary = self.work / 'rule.dslb'
-        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\nsavedsl(p, ARGV[0]);\n')
-        r = subprocess.run([*compiler_argv(), str(src), str(binary)], capture_output=True, text=True)
+        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\n')
+        r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(src), str(binary)], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         return binary
 
@@ -72,10 +72,10 @@ class RulePacksOS(unittest.TestCase):
         for pack in packs:
             with self.subTest(pack=pack.name):
                 header = [line[9:].split() for line in pack.read_text().splitlines() if line.startswith('# check: ')]
-                r = subprocess.run([*compiler_argv(), str(pack), str(self.work / (pack.stem + '.dslb'))], capture_output=True, text=True, cwd=ROOT)
+                r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(pack), str(self.work / (pack.stem + '.dslb'))], capture_output=True, text=True, cwd=ROOT)
                 self.assertEqual(r.returncode, 0, r.stderr)
-                # The packs savedsl to a hardcoded build/rules-lmcode/<stem>.dslb (relative to cwd).
-                binary = ROOT / 'build/rules-lmcode' / (pack.stem + '.dslb')
+                # Use this test invocation's explicit fixture output, never a stale build artifact.
+                binary = self.work / (pack.stem + '.dslb')
                 self.assertTrue(binary.exists(), r.stdout + r.stderr)
                 if header:
                     lang, fixture = header[0]
@@ -85,9 +85,9 @@ class RulePacksOS(unittest.TestCase):
                     lines = result.stdout.split(b'\n')
                     self.assertEqual(lines.pop(), b'')
                     self.assertEqual(lines.pop(), b'LMCODE_RETURN_END')
-                    self.assertEqual(lines.pop(), b'null')
+                    self.assertEqual(lines.pop(), b'{"ok":true,"result":null}')
                     self.assertEqual(lines.pop(), b'LMCODE_RETURN_BEGIN')
-                    self.assertEqual(lines.pop(), b'{"ok": true, "result": null}')  # run-protocol line
+                    self.assertEqual(json.loads(lines.pop()), {"host_summary":{"input":Path(fixture).as_posix()}})
                     count = lines.pop().decode()
                     findings = json.loads(lines[0])
                     self.assertEqual(len(lines), 1, lines)  # one findings group, one count line
@@ -100,7 +100,7 @@ class RulePacksOS(unittest.TestCase):
                     result = self.run_host('--lmcode', binary, cwd=ROOT)
                     self.assertEqual(result.stderr, b'', result)
                     self.assertEqual(result.returncode, 0, result.stdout)
-                    self.assertTrue(result.stdout.endswith(b'LMCODE_RETURN_BEGIN\nnull\nLMCODE_RETURN_END\n'), result.stdout)
+                    self.assertTrue(result.stdout.endswith(b'LMCODE_RETURN_BEGIN\n{"ok":true,"result":null}\nLMCODE_RETURN_END\n'), result.stdout)
 
     def test_crlf_and_missing_trailing_newline_are_byte_stable(self):
         # Findings are computed on bytes: CRLF and a missing final newline must
@@ -116,9 +116,9 @@ class RulePacksOS(unittest.TestCase):
             lines = result.stdout.split(b'\n')
             self.assertEqual(lines.pop(), b'')
             self.assertEqual(lines.pop(), b'LMCODE_RETURN_END')
-            self.assertEqual(lines.pop(), b'null')
+            self.assertEqual(lines.pop(), b'{"ok":true,"result":null}')
             self.assertEqual(lines.pop(), b'LMCODE_RETURN_BEGIN')
-            self.assertEqual(lines.pop(), b'{"ok": true, "result": null}')  # run-protocol line
+            self.assertEqual(json.loads(lines.pop()), {"host_summary":{"input":source.as_posix()}})
             count = lines.pop()
             self.assertEqual(count, ('2 findings in ' + source.as_posix()).encode())
             groups.append(lines[0])
@@ -143,7 +143,7 @@ class RulePacksOS(unittest.TestCase):
                 match = [f for f in findings if f['message'] == name]
                 self.assertEqual(len(match), 1, findings)
                 self.assertEqual(match[0]['end_col'] - match[0]['col'], len(name.encode('utf-8')), match)
-                self.assertTrue(result.stdout.endswith((' findings in ' + source.as_posix() + '\n{"ok": true, "result": null}\nLMCODE_RETURN_BEGIN\nnull\nLMCODE_RETURN_END\n').encode()), result.stdout)
+                self.assertTrue(result.stdout.endswith((' findings in ' + source.as_posix() + '\n'+json.dumps({'host_summary':{'input':source.as_posix()}},ensure_ascii=False,separators=(',',':'))+'\nLMCODE_RETURN_BEGIN\n{"ok":true,"result":null}\nLMCODE_RETURN_END\n').encode()), result.stdout)
 
     def test_anonymous_kind_annotations_dispatch_on_every_grammar(self):
         # Anonymous (unnamed) node kinds are legal annotation values (R47 keeps
@@ -169,7 +169,7 @@ class RulePacksOS(unittest.TestCase):
                 self.assertEqual((result.returncode, result.stderr), (0, b''), result)
                 findings = json.loads(result.stdout.split(b'\n')[0])
                 self.assertEqual([(f['message'], f['rule']) for f in findings], [(want_text, 'KW')] * want_count, findings)
-                self.assertTrue(result.stdout.endswith((f'{want_count} findings in {source.as_posix()}\n' + '{"ok": true, "result": null}\nLMCODE_RETURN_BEGIN\nnull\nLMCODE_RETURN_END\n').encode()), result.stdout)
+                self.assertTrue(result.stdout.endswith((f'{want_count} findings in {source.as_posix()}\n' + json.dumps({'host_summary':{'input':source.as_posix()}},ensure_ascii=False,separators=(',',':'))+'\nLMCODE_RETURN_BEGIN\n{"ok":true,"result":null}\nLMCODE_RETURN_END\n').encode()), result.stdout)
 
     def test_multi_file_groups_follow_argument_order(self):
         # Group order is argument order (never sorted, never walked order) and

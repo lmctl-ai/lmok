@@ -75,4 +75,6 @@ fn cognitive_complexity(n: Node) -> void implements Rule {
   if (score > 15) { ts.report(n, "cognitive complexity (" + str(score) + ")", "LBP103", "major"); }
 }
 end _lmcode_
-savedsl(p, "build/rules-lmcode/python-function-cognitive-complexity.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

@@ -313,8 +313,8 @@ class Autofix(unittest.TestCase):
         src.write_text(
             "p = _lmcode_ schema=" + json.dumps(str(schema)) + ";\n"
             "@identifier fn f(n: Node) -> void implements Rule { ts.report_fix(n, \"fix\", \"ENTRY_FIX\", \"minor\", \"renamed\"); }\n"
-            "end _lmcode_\nsavedsl(p, ARGV[0]);\n", encoding="utf-8")
-        compiled = subprocess.run([compiler, str(src), str(bytecode)], capture_output=True, text=True)
+            "end _lmcode_\n", encoding="utf-8")
+        compiled = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(src), str(bytecode)], capture_output=True, text=True)
         self.assertEqual(compiled.returncode, 0, compiled.stderr)
         source = self.work / "entry.c"
         source.write_bytes(b"int old;\n")

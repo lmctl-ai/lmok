@@ -10,7 +10,7 @@ lmscript examples/parse-string.lms
 build/lmok --lmcode build/parse-string.dslb
 ```
 
-The outer script's `savedsl` call chooses the output filename. A second
+The outer script constructs a program and calls run_lmcode. A standalone
 positional argument to `lmscript` is a script argument, not an output-path
 option. Compilation is normally silent. Execution prints the JSON text,
 its tree, `has_error -> false`, `nodes -> 34`, and the host success record
@@ -90,7 +90,7 @@ nonzero process exit status.
   `ts.changed_ranges` shows what moved, and the re-linted NEW tree finds the
   inserted unsafe call
 - `lint-repo.lms` — outer-lmscript composition: drives the `lmok lint`
-  CLI dispatcher as a subprocess via `dsl_cli` + `system`, asserts exit
+  CLI dispatcher as a subprocess via explicit `system` argv, asserts exit
   codes, counts findings in stdout
 - `rules/` — demo rule packs for the `lint` subcommand (`c-security.json`:
   unsafe-call query + `on: comment`/`on: goto_statement` kind rules;

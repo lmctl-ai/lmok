@@ -127,7 +127,7 @@ the TODO in scripts/select-compiler.sh).
   (e.g. 0.2.38) unrelated to npm release numbering; the numeric floor in
   select-compiler.sh targets npm numbering, with the functional probe (DSLB
   v5, schema-hash binding, implicit std) as the real gate.
-- **`savedsl` does not create parent directories** — compiling into a fresh
+- **The fixture compiler does not create parent directories** — compiling into a fresh
   subdirectory needs a `mkdir -p` first.
 
 ## Verification

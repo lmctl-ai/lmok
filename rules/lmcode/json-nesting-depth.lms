@@ -39,4 +39,6 @@ fn no_deep_nesting(n: Node) -> void implements Rule {
 fn no_deep_nesting_array(n: Node) -> void implements Rule { no_deep_nesting(n); }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/json-nesting-depth.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

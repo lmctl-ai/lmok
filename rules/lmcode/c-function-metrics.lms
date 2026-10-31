@@ -49,4 +49,6 @@ fn too_many_parameters(n: Node) -> void implements Rule {
 }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/c-function-metrics.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

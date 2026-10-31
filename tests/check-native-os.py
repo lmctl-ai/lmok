@@ -156,7 +156,7 @@ class NativeOS(unittest.TestCase):
         result = self.run_host('--lmcode', bad)
         self.assertEqual(result.returncode, 3)
         self.assertEqual(result.stderr, b'')
-        error = json.loads(result.stdout)
+        error = json.loads(result.stdout.splitlines()[-2])
         self.assertEqual(error['code'], 'LOAD_BAD_BYTECODE')
         self.assertIn('bad magic', error['message'])  # Proves the Unicode file was actually opened.
         link = folder / 'linked.json'
@@ -223,7 +223,7 @@ class NativeOS(unittest.TestCase):
         self.assertEqual((result.returncode, result.stderr), (3, b''))
         self.assertTrue(result.stdout.endswith(b'\n'))
         self.assertNotIn(b'\r', result.stdout)
-        report = json.loads(result.stdout)
+        report = json.loads(result.stdout.splitlines()[-2])
         self.assertEqual((report['ok'], report['phase'], report['code']), (False, 'load', 'LOAD_BAD_BYTECODE'))
     def test_bounded_regex_and_query(self):
         source = self.work / 'input.json'; source.write_bytes(json.dumps('a'*30+'!').encode())

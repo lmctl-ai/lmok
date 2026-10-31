@@ -33,7 +33,7 @@ LBC103 switch without default (default = `case_statement` with text prefix
 LBC104 if without braces (consequence child kind), LBJ101 duplicate object
 keys (per-object StrMap), LBJ102 object too large. Each file reads its
 violations fixture via `file_read`; test.sh sed-substitutes the clean-fixture
-path (and the savedsl target) into a scratch copy and asserts zero findings.
+path (and its fixture output target) into a scratch copy and asserts zero findings.
 Nothing turned out non-tier-1 in this batch — all four rule families fit
 current lmcode.
 

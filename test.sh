@@ -22,6 +22,7 @@ ok(){ pass=$((pass+1)); echo "ok $pass - $1"; }
 fail(){ echo "FAIL: $*" >&2; exit 1; }
 
 LMSCRIPT="$(scripts/select-compiler.sh)"
+compile_fixture(){ node scripts/compile-fixture.mjs "$@"; }
 scripts/sync-sdk.sh --verify >/dev/null || fail "SDK header pin mismatch"
 ok "SDK headers match sdk.lock"
 scripts/sync-deps.sh --verify >/dev/null || fail "deps pin mismatch"
@@ -341,55 +342,51 @@ ok "lint: json-tier1 pack, all 11 rules fire on violations, clean fixture silent
 
 # --- DSL bytecode ---
 cat > "$WORK/smoke.lms" <<EOF
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let tree = ts.parse("{\"name\": \"lmok\", \"tags\": [\"tree-sitter\", \"json\"]}");
 println(tree.sexp());
 println("has_error -> " + str(tree.has_error()));
 println("nodes -> " + str(tree.node_count()));
-end _dsl_
-savedsl(p, "$WORK/smoke.dslb");
+end _lmcode_
 EOF
-"$LMSCRIPT" "$WORK/smoke.lms" "$WORK/smoke.dslb" >/dev/null || fail "smoke compile"
+compile_fixture "$WORK/smoke.lms" "$WORK/smoke.dslb" >/dev/null || fail "smoke compile"
 [ "$(od -An -t u1 -j 5 -N 1 "$WORK/smoke.dslb" | tr -d ' ')" = 6 ] || fail "smoke was not compiled as bytecode v6"
 out="$("$HOST" --lmcode "$WORK/smoke.dslb")"
 [ "$(tail -1 <<<"$out")" = 'LMCODE_RETURN_END' ] || fail "smoke run: $out"
-grep -qxF '{"ok": true, "result": null}' <<<"$out" || fail "smoke run protocol: $out"
+grep -qxF '{"ok":true,"result":null}' <<<"$out" || fail "smoke run protocol: $out"
 grep -qxF '(document (object (pair key: (string (string_content)) value: (string (string_content))) (pair key: (string (string_content)) value: (array (string (string_content)) (string (string_content))))))' <<<"$out" || fail "smoke sexp line: $out"
 grep -q '^has_error -> false$' <<<"$out" || fail "smoke has_error line: $out"
 grep -q '^nodes -> 34$' <<<"$out" || fail "smoke node_count line: $out"
 ok "bytecode: ts.parse/sexp/has_error/node_count through the DSL"
 
 cat > "$WORK/error-tree.lms" <<EOF
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let tree = ts.parse("{\"a\": 1,,}");
 if (!tree.has_error()) { println("bad"); }
 println("error flagged");
-end _dsl_
-savedsl(p, "$WORK/error-tree.dslb");
+end _lmcode_
 EOF
-"$LMSCRIPT" "$WORK/error-tree.lms" "$WORK/error-tree.dslb" >/dev/null || fail "error-tree compile"
+compile_fixture "$WORK/error-tree.lms" "$WORK/error-tree.dslb" >/dev/null || fail "error-tree compile"
 out="$("$HOST" --lmcode "$WORK/error-tree.dslb")"
 grep -q '^error flagged$' <<<"$out" || fail "malformed JSON must set has_error: $out"
 ok "bytecode: malformed JSON flags Tree.has_error"
 
 cat > "$WORK/wrong-arg.lms" <<EOF
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 ts.parse(42);
-end _dsl_
-savedsl(p, "$WORK/wrong-arg.dslb");
+end _lmcode_
 EOF
-set +e; "$LMSCRIPT" "$WORK/wrong-arg.lms" "$WORK/wrong-arg.dslb" >"$WORK/type-error.txt" 2>&1; code=$?; set -e
+set +e; compile_fixture "$WORK/wrong-arg.lms" "$WORK/wrong-arg.dslb" >"$WORK/type-error.txt" 2>&1; code=$?; set -e
 [ "$code" = 2 ] || fail "wrong-argument call must be a compile error (exit $code)"
 ok "type mismatch refused at compile (exit 2)"
 
 cat > "$WORK/oob.lms" <<EOF
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let names = str_list().add("a");
 names.at(5);
-end _dsl_
-savedsl(p, "$WORK/oob.dslb");
+end _lmcode_
 EOF
-"$LMSCRIPT" "$WORK/oob.lms" "$WORK/oob.dslb" >/dev/null || fail "compile"
+compile_fixture "$WORK/oob.lms" "$WORK/oob.dslb" >/dev/null || fail "compile"
 set +e; out="$("$HOST" --lmcode "$WORK/oob.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'out of range'* ]] || fail "StrList.at bounds (exit $code): $out"
 ok "StrList.at bounds refused at runtime (exit 3)"
@@ -399,22 +396,20 @@ p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let c = ts.parse_c("int x;\\n");
 ts.match_c(c.root(), "strcpy(\$A");
 end _lmcode_
-savedsl(p, "$WORK/bad-pattern.dslb");
 EOF
-"$LMSCRIPT" "$WORK/bad-pattern.lms" "$WORK/bad-pattern.dslb" >/dev/null || fail "bad-pattern compile"
+compile_fixture "$WORK/bad-pattern.lms" "$WORK/bad-pattern.dslb" >/dev/null || fail "bad-pattern compile"
 set +e; out="$("$HOST" --lmcode "$WORK/bad-pattern.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *"pattern 'strcpy(\$A' does not parse as c"* ]] || fail "ts.match_c bad pattern (exit $code): $out"
 ok "bytecode: ts.match_c with an unparseable pattern is a runtime error naming the fragment (exit 3)"
 
 cat > "$WORK/root-parent.lms" <<EOF
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let r = ts.parse("{}").root();
 if (r.has_parent()) { println("bad"); }
 r.parent();
-end _dsl_
-savedsl(p, "$WORK/root-parent.dslb");
+end _lmcode_
 EOF
-"$LMSCRIPT" "$WORK/root-parent.lms" "$WORK/root-parent.dslb" >/dev/null || fail "root-parent compile"
+compile_fixture "$WORK/root-parent.lms" "$WORK/root-parent.dslb" >/dev/null || fail "root-parent compile"
 set +e; out="$("$HOST" --lmcode "$WORK/root-parent.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'root node has no parent'* ]] || fail "Node.parent on root (exit $code): $out"
 ok "Node.parent: has_parent() false at root, parent() on root refused (exit 3)"
@@ -423,17 +418,17 @@ set +e; out="$("$HOST" 2>&1)"; code=$?; set -e
 [ "$code" = 2 ] && [[ "$out" == *'usage: lmok'* ]] || fail "bad args refusal (exit $code): $out"
 ok "bad arguments refused (exit 2)"
 set +e; out="$("$HOST" --lmcode "$WORK/no-such.dslb" 2>&1)"; code=$?; set -e
-[ "$code" = 3 ] && [[ "$out" == *'"phase": "load"'* ]] || fail "missing bytecode refusal (exit $code): $out"
+[ "$code" = 3 ] && [[ "$out" == *'"phase":"load"'* ]] || fail "missing bytecode refusal (exit $code): $out"
 ok "missing bytecode file refused at load (exit 3)"
 
-"$HOST" --lmcode "$WORK/smoke.dslb" "$WORK/error-tree.dslb" >"$WORK/multi.jsonl" || fail "multi-bytecode run"
-[ "$(grep -c '^{"ok": true, "result": null}$' "$WORK/multi.jsonl")" = 2 ] || fail "multiple bytecode files did not run in order"
+"$HOST" --lmcode "$WORK/smoke.dslb" --lmcode "$WORK/error-tree.dslb" >"$WORK/multi.jsonl" || fail "multi-bytecode run"
+grep -qxF '{"ok":true,"result":[null,null],"parts":2}' "$WORK/multi.jsonl" || fail "multiple bytecode files did not run in order"
 ok "multiple bytecode files run sequentially"
 
 # --- examples compile and run ---
 mkdir -p build
 for f in parse-string parse-file detect-error cst-rules lint-json report-json query-json lint-c rule-catalog suppress-findings sarif-report incremental-reparse pattern-rules autofix-report; do
-  "$LMSCRIPT" "examples/$f.lms" "build/$f.dslb" >"$WORK/$f.compile.log" 2>&1 || fail "$f example compile"
+  compile_fixture "examples/$f.lms" "build/$f.dslb" >"$WORK/$f.compile.log" 2>&1 || fail "$f example compile"
   "$HOST" --lmcode "build/$f.dslb" >"$WORK/$f.out" || fail "$f example run"
   # every '# expect:' line must appear in the program output
   while IFS= read -r line; do
@@ -513,17 +508,17 @@ run_rule() {
 # --- rules/lmcode (lmcode-native tier-1 rules) ---
 mkdir -p build/rules-lmcode
 for f in c-function-metrics c-switch-style json-duplicate-values json-duplicate-keys json-size-limits c-nesting-depth json-nesting-depth c-scanf-width c-symbol-rules c-cross-file; do
-  "$LMSCRIPT" "rules/lmcode/$f.lms" "build/rules-lmcode/$f.dslb" >"$WORK/$f.compile.log" 2>&1 || fail "$f rule compile"
+  compile_fixture "rules/lmcode/$f.lms" "build/rules-lmcode/$f.dslb" >"$WORK/$f.compile.log" 2>&1 || fail "$f rule compile"
   run_rule "rules/lmcode/$f.lms" "build/rules-lmcode/$f.dslb" >"$WORK/$f.out" || fail "$f rule run"
   while IFS= read -r line; do
     grep -qxF "${line:2}" "$WORK/$f.out" || fail "$f output missing: ${line:2} (got $(cat "$WORK/$f.out"))"
   done < <(grep '^#|' "rules/lmcode/$f.lms")
-  # clean-fixture variant: substitute the fixture path AND the savedsl target
+  # clean-fixture variant: substitute the fixture path AND the fixture output target
   # into a scratch copy, expect an empty findings array and a zero count
   sed -e 's/-violations\./-clean./' -e 's|cross/a\.c|cross/clean-a.c|g' -e 's|cross/b\.c|cross/clean-b.c|g' \
       -e "s|build/rules-lmcode/$f.dslb|$WORK/$f-clean.dslb|" \
     "rules/lmcode/$f.lms" > "$WORK/$f-clean.lms"
-  "$LMSCRIPT" "$WORK/$f-clean.lms" "$WORK/$f-clean.dslb" >/dev/null 2>&1 || fail "$f clean compile"
+  compile_fixture "$WORK/$f-clean.lms" "$WORK/$f-clean.dslb" >/dev/null 2>&1 || fail "$f clean compile"
   out="$(run_rule "$WORK/$f-clean.lms" "$WORK/$f-clean.dslb")"
   grep -qxF '[]' <<<"$out" || fail "$f clean fixture findings: $out"
   grep -qx '0 findings\( in .*\)\?' <<<"$out" || fail "$f clean fixture count: $out"
@@ -532,29 +527,27 @@ ok "rules/lmcode: ten rule files fire on violations fixtures, silent on clean"
 
 # --- incremental reparse contract (E5) ---
 cat > "$WORK/reparse-contract.lms" <<EOF2
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let old = ts.parse("{}");
 old.edit(1, 1, 2);
 let new = ts.reparse(old, "{ }");
 println("ranges " + ts.changed_ranges(old, new));
 println("old root kind " + old.root().kind());
-end _dsl_
-savedsl(p, "$WORK/reparse-contract.dslb");
+end _lmcode_
 EOF2
-"$LMSCRIPT" "$WORK/reparse-contract.lms" "$WORK/reparse-contract.dslb" >/dev/null || fail "reparse-contract compile"
+compile_fixture "$WORK/reparse-contract.lms" "$WORK/reparse-contract.dslb" >/dev/null || fail "reparse-contract compile"
 out="$("$HOST" --lmcode "$WORK/reparse-contract.dslb")"
 grep -q '^ranges \[\[1,2\]\]$' <<<"$out" || fail "changed_ranges: $out"
 grep -q '^old root kind document$' <<<"$out" || fail "old tree alive after reparse: $out"
 ok "reparse: old tree stays alive (changed_ranges + root kind readable)"
 
 cat > "$WORK/bad-edit.lms" <<EOF2
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let t = ts.parse("{}");
 t.edit(5, 1, 5);
-end _dsl_
-savedsl(p, "$WORK/bad-edit.dslb");
+end _lmcode_
 EOF2
-"$LMSCRIPT" "$WORK/bad-edit.lms" "$WORK/bad-edit.dslb" >/dev/null || fail "bad-edit compile"
+compile_fixture "$WORK/bad-edit.lms" "$WORK/bad-edit.dslb" >/dev/null || fail "bad-edit compile"
 set +e; out="$("$HOST" --lmcode "$WORK/bad-edit.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'bad byte offsets'* ]] || fail "edit out of range (exit $code): $out"
 ok "Tree.edit: out-of-range offsets refused (exit 3)"
@@ -574,28 +567,26 @@ ok "regex over node text is bounded: 100 KB comment lints and queries without cr
 
 # M1: reparse without an edit must not hand back the old tree for new text.
 cat > "$WORK/reparse-noedit.lms" <<EOF2
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let same = ts.parse("{}");
 println("same " + ts.reparse(same, "{}").sexp());
 let old = ts.parse("{}");
 let new = ts.reparse(old, "[1, 2, 3]");
 println("unreachable " + new.sexp());
-end _dsl_
-savedsl(p, "$WORK/reparse-noedit.dslb");
+end _lmcode_
 EOF2
-"$LMSCRIPT" "$WORK/reparse-noedit.lms" "$WORK/reparse-noedit.dslb" >/dev/null || fail "reparse-noedit compile"
+compile_fixture "$WORK/reparse-noedit.lms" "$WORK/reparse-noedit.dslb" >/dev/null || fail "reparse-noedit compile"
 set +e; out="$("$HOST" --lmcode "$WORK/reparse-noedit.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'no pending edit for changed text'* ]] && grep -q '^same (document (object))$' <<<"$out" \
   || fail "reparse without edit (exit $code): $out"
 cat > "$WORK/reparse-badlen.lms" <<EOF2
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let t = ts.parse("{\"a\": 1}");
 t.edit(1, 1, 50);
 let n = ts.reparse(t, "{\"a\": 1}");
-end _dsl_
-savedsl(p, "$WORK/reparse-badlen.dslb");
+end _lmcode_
 EOF2
-"$LMSCRIPT" "$WORK/reparse-badlen.lms" "$WORK/reparse-badlen.dslb" >/dev/null || fail "reparse-badlen compile"
+compile_fixture "$WORK/reparse-badlen.lms" "$WORK/reparse-badlen.dslb" >/dev/null || fail "reparse-badlen compile"
 set +e; out="$("$HOST" --lmcode "$WORK/reparse-badlen.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'new text is 8 bytes but the pending edit implies 57'* ]] || fail "reparse inconsistent edit (exit $code): $out"
 ok "reparse contract: identical text ok, changed text without edit refused, edit/text length mismatch refused (exit 3)"
@@ -609,16 +600,15 @@ with open(sys.argv[1], 'w') as f:
         f.write(f'int f{i}(int a, int b) {{ return a + b * {i}; }}\n')
 PY
 cat > "$WORK/bigwalk.lms" <<EOF2
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let t = ts.parse_c(file_read("$WORK/many.c"));
 let ns = t.nodes();
 let c = 0;
 for (n in ns) { if (n.kind() == "identifier") { c = c + 1; } }
 println("named " + str(ns.len()) + " identifiers " + str(c));
-end _dsl_
-savedsl(p, "$WORK/bigwalk.dslb");
+end _lmcode_
 EOF2
-"$LMSCRIPT" "$WORK/bigwalk.lms" "$WORK/bigwalk.dslb" >/dev/null || fail "bigwalk compile"
+compile_fixture "$WORK/bigwalk.lms" "$WORK/bigwalk.dslb" >/dev/null || fail "bigwalk compile"
 out="$("$HOST" --lmcode "$WORK/bigwalk.dslb")" || fail "bigwalk run: $out"
 grep -q '^named 180003 identifiers 50000$' <<<"$out" || fail "bigwalk output: $out"
 ok "NodeList iteration over a 180k-node C tree runs in one program (no per-visit Node handles)"
@@ -626,19 +616,18 @@ ok "NodeList iteration over a 180k-node C tree runs in one program (no per-visit
 # M3: arenas reset per --lmcode file: 3 runs x 400k root() handles would exceed
 # the 1<<20 Node cap if the arena carried over; findings reset too.
 cat > "$WORK/handles.lms" <<EOF2
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let t = ts.parse("{}");
 let r = t.root();
 for (i in range(0, 400000)) { r = t.root(); }
 ts.report(r, "one per run");
 println("findings " + str(ts.report_count()));
-end _dsl_
-savedsl(p, "$WORK/handles.dslb");
+end _lmcode_
 EOF2
-"$LMSCRIPT" "$WORK/handles.lms" "$WORK/handles.dslb" >/dev/null || fail "handles compile"
-out="$("$HOST" --lmcode "$WORK/handles.dslb" "$WORK/handles.dslb" "$WORK/handles.dslb")" || fail "handles x3 run: $out"
-[ "$(grep -c '^findings 1$' <<<"$out")" = 3 ] && [ "$(grep -c '^LMCODE_RETURN_END$' <<<"$out")" = 3 ] || fail "handles x3 output: $out"
-ok "--lmcode arenas (trees/nodes/lists/findings) reset per program: 3 x 400k handles run, findings restart at 1"
+compile_fixture "$WORK/handles.lms" "$WORK/handles.dslb" >/dev/null || fail "handles compile"
+out="$("$HOST" --lmcode "$WORK/handles.dslb" --lmcode "$WORK/handles.dslb" --lmcode "$WORK/handles.dslb")" || fail "handles x3 run: $out"
+[ "$(grep -c '^findings [123]$' <<<"$out")" = 3 ] && [ "$(grep -c '^LMCODE_RETURN_END$' <<<"$out")" = 1 ] || fail "handles x3 output: $out"
+ok "--lmcode shared invocation context: 3 x 400k node visits retain findings in one envelope"
 
 # M4: an iterator error during directory expansion fails fast (exit 3), never a silent partial list.
 if [ "$(id -u 2>/dev/null || echo 0)" != 0 ] && [[ "$UNAME_S" != MINGW* && "$UNAME_S" != MSYS* && "$UNAME_S" != CYGWIN* ]]; then
@@ -809,14 +798,14 @@ ok "lint: bash-tier1 pack, all 6 rules fire on violations, clean fixture silent"
 # --- rules/lmcode: python and bash logic rules ---
 mkdir -p build/rules-lmcode
 for f in python-function-metrics bash-unquoted-vars; do
-  "$LMSCRIPT" "rules/lmcode/$f.lms" "build/rules-lmcode/$f.dslb" >"$WORK/$f.compile.log" 2>&1 || fail "$f rule compile"
+  compile_fixture "rules/lmcode/$f.lms" "build/rules-lmcode/$f.dslb" >"$WORK/$f.compile.log" 2>&1 || fail "$f rule compile"
   run_rule "rules/lmcode/$f.lms" "build/rules-lmcode/$f.dslb" >"$WORK/$f.out" || fail "$f rule run"
   while IFS= read -r line; do
     grep -qxF "${line:2}" "$WORK/$f.out" || fail "$f output missing: ${line:2} (got $(cat "$WORK/$f.out"))"
   done < <(grep '^#|' "rules/lmcode/$f.lms")
   sed -e 's/-violations\./-clean./' -e "s|build/rules-lmcode/$f.dslb|$WORK/$f-clean.dslb|" \
     "rules/lmcode/$f.lms" > "$WORK/$f-clean.lms"
-  "$LMSCRIPT" "$WORK/$f-clean.lms" "$WORK/$f-clean.dslb" >/dev/null 2>&1 || fail "$f clean compile"
+  compile_fixture "$WORK/$f-clean.lms" "$WORK/$f-clean.dslb" >/dev/null 2>&1 || fail "$f clean compile"
   out="$(run_rule "$WORK/$f-clean.lms" "$WORK/$f-clean.dslb")"
   grep -qxF '[]' <<<"$out" || fail "$f clean fixture findings: $out"
   grep -qx '0 findings\( in .*\)\?' <<<"$out" || fail "$f clean fixture count: $out"
@@ -913,15 +902,15 @@ for index in -1 4294967296 9223372036854775807; do
 expression="$index"
 if [ "$index" = 9223372036854775807 ]; then expression="9007199254740991 * 1024 + 1023"; fi
 cat > "$WORK/child-index.lms" <<EOF_CHILD
-p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
 let r = ts.parse("{}").root();
 r.child($expression);
-end _dsl_
-savedsl(p, "$WORK/child-index.dslb");
+end _lmcode_
 EOF_CHILD
-"$LMSCRIPT" "$WORK/child-index.lms" "$WORK/child-index.dslb" >/dev/null || fail "child-index compile"
+compile_fixture "$WORK/child-index.lms" "$WORK/child-index.dslb" >/dev/null || fail "child-index compile"
 set +e; out="$("$HOST" --lmcode "$WORK/child-index.dslb" 2>&1)"; code=$?; set -e
-[ "$code" = 3 ] && [ "$out" = '{"ok": false, "phase": "run", "code": "RUN_HOST", "message": "dsl line 3:3: Node.child index '"$index"' out of range (named child count 1)", "line": 3, "column": 3}' ] || fail "child-index (exit $code): $out"
+expected="$(printf '%s\n%s\n%s' LMCODE_RETURN_BEGIN '{"ok":false,"phase":"run","code":"RUN_HOST","message":"dsl line 3:3: Node.child index '"$index"' out of range (named child count 1)","line":3,"column":3}' LMCODE_RETURN_END)"
+[ "$code" = 3 ] && [ "$out" = "$expected" ] || fail "child-index (exit $code): $out"
 done
 ok "robustness: negative, uint32 overflow and int64-max Node.child indices (exact bytes)"
 
@@ -933,7 +922,7 @@ for data, message in [(b'', "not a DSL bytecode file: bad magic (expected 'DSLB'
                       (b'DSLB', 'bytecode is truncated: wanted 2 byte(s) at offset 4, file has 4')]:
     p.write_bytes(data)
     r = subprocess.run([host,'--lmcode',str(p)],capture_output=True,timeout=5)
-    expected = '{"ok": false, "phase": "load", "code": "LOAD_BAD_BYTECODE", "message": "'+message+'"}\n'
+    expected = 'LMCODE_RETURN_BEGIN\n{"ok":false,"phase":"load","code":"LOAD_BAD_BYTECODE","message":"'+message+'"}\nLMCODE_RETURN_END\n'
     assert (r.returncode,r.stdout,r.stderr) == (3,expected.encode(),b''), r
 PY
 ok "robustness: empty, corrupted and truncated bytecode (exact bytes)"
@@ -1228,7 +1217,7 @@ ok "rule metadata and annotated pack harness"
 "$HOST" test rules/c-tier1.json tests/fixtures/c-tier1-annotated.c || fail "annotated C pack"
 "$HOST" test rules/python-tier1.json tests/fixtures/python-tier1-annotated.py || fail "annotated Python pack"
 "$HOST" test examples/self-test/pack.json examples/self-test/fixture.c || fail "self-test example"
-"$LMSCRIPT" examples/report-metadata.lms >"$WORK/report-metadata.compile" || fail "metadata example compile"
+compile_fixture examples/report-metadata.lms build/report-metadata.dslb >"$WORK/report-metadata.compile" || fail "metadata example compile"
 "$HOST" --lmcode build/report-metadata.dslb --metadata >"$WORK/report-metadata.json" || fail "metadata example run"
 python3 - "$WORK/report-metadata.json" <<'PYMETA'
 import json, sys

@@ -47,9 +47,9 @@ class JavaOS(unittest.TestCase):
   if os.name=='nt' and not compiler.lower().endswith(('.cmd','.exe','.bat')):compiler=shutil.which(compiler+'.cmd') or compiler+'.cmd'
   source=self.work/'api.lms';binary=self.work/'api.dslb'
   body='let t = ts.parse_java("class A {}"); println(t.root().kind()); for (n in ts.query_java(t.root(), "(identifier) @id")) { println(n.text()); } let next = ts.reparse_java(t, "class A {}"); println(next.root().kind());'
-  source.write_text('p = _lmcode_ schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json'))+';\n'+body+'\nend _lmcode_\nsavedsl(p, ARGV[0]);\n',encoding='utf-8')
-  r=subprocess.run([compiler,str(source),str(binary)],capture_output=True,cwd=ROOT,timeout=30);self.assertEqual(r.returncode,0,r.stderr)
-  self.assertEqual(self.run_host('--lmcode',binary),b'program\nA\nprogram\n{"ok": true, "result": null}\nLMCODE_RETURN_BEGIN\nnull\nLMCODE_RETURN_END\n')
+  source.write_text('p = _lmcode_ schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json'))+';\n'+body+'\nend _lmcode_\n',encoding='utf-8')
+  r=subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"),str(source),str(binary)],capture_output=True,cwd=ROOT,timeout=30);self.assertEqual(r.returncode,0,r.stderr)
+  self.assertEqual(self.run_host('--lmcode',binary),b'program\nA\nprogram\n{"host_summary":{"part":0}}\nLMCODE_RETURN_BEGIN\n{"ok":true,"result":null}\nLMCODE_RETURN_END\n')
  def test_rule_omission_controls(self):
   pack=json.loads((ROOT/'rules/java-tier1.json').read_text(encoding='utf-8'))
   expected=collections.Counter({**{'LJV%03d'%i:1 for i in range(1,10)},'LJV008':2})
@@ -64,8 +64,8 @@ class JavaOS(unittest.TestCase):
   compiler=os.environ.get('LMSCRIPT_BIN','lmscript')
   if os.name=='nt' and not compiler.lower().endswith(('.cmd','.exe','.bat')):compiler=shutil.which(compiler+'.cmd') or compiler+'.cmd'
   source=self.work/'rule.lms';binary=self.work/'rule.dslb'
-  source.write_text('p = _lmcode_ schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json'))+';\n@method_declaration fn methods(n: Node) -> void implements Rule { ts.report(n, "method", "JAVA", "minor"); }\nend _lmcode_\nsavedsl(p, ARGV[0]);\n',encoding='utf-8')
-  result=subprocess.run([compiler,str(source),str(binary)],capture_output=True,cwd=ROOT,timeout=30);self.assertEqual(result.returncode,0,result.stderr)
+  source.write_text('p = _lmcode_ schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json'))+';\n@method_declaration fn methods(n: Node) -> void implements Rule { ts.report(n, "method", "JAVA", "minor"); }\nend _lmcode_\n',encoding='utf-8')
+  result=subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"),str(source),str(binary)],capture_output=True,cwd=ROOT,timeout=30);self.assertEqual(result.returncode,0,result.stderr)
   code=self.work/'Input.java';code.write_text('class Demo { void run() {} }',encoding='utf-8')
   output=self.run_host('check','--lang','java',binary,code).splitlines();self.assertEqual(json.loads(output[0])[0]['rule'],'JAVA');self.assertTrue(output[1].startswith(b'1 findings in '))
 if __name__=='__main__':

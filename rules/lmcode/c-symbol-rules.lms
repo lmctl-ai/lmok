@@ -80,4 +80,6 @@ fn symbol_sets(root: Node) -> void implements Rule {
 # function_definition entries, so aggregate findings precede LBC109.
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/c-symbol-rules.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

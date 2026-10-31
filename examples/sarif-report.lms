@@ -86,4 +86,6 @@ file_write("build/sarif-results.sarif", sarif);
 println("sarif: " + str(ts.report_count()) + " results written to build/sarif-results.sarif");
 
 end _lmcode_
-savedsl(p, "build/sarif-report.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

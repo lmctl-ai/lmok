@@ -40,4 +40,6 @@ fn if_without_braces(n: Node) -> void implements Rule {
 }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/c-switch-style.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

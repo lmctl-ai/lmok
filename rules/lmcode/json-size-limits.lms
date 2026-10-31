@@ -21,4 +21,6 @@ fn object_too_large(n: Node) -> void implements Rule {
 }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/json-size-limits.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

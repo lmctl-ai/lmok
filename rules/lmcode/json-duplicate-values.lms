@@ -33,4 +33,6 @@ fn no_duplicate_values(n: Node) -> void implements Rule {
 }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/json-duplicate-values.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

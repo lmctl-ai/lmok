@@ -53,4 +53,6 @@ if (critical > 0) { gate = "FAIL"; }
 println("catalog: critical=" + str(critical) + " minor=" + str(minor) + " gate=" + gate);
 
 end _lmcode_
-savedsl(p, "build/rule-catalog.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

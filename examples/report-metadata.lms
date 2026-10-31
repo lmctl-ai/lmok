@@ -12,4 +12,6 @@ let n = tree.root().child(0);
 ts.report_meta(n, "example", "META001", "info", "{\"tags\":[\"example\"],\"confidence\":\"high\"}");
 println(ts.report_json());
 end _lmcode_
-savedsl(p, "build/report-metadata.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

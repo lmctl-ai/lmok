@@ -104,8 +104,8 @@ class ScriptLanguages(unittest.TestCase):
         rule.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n'
                         '@function_declaration fn check(n: Node) -> void implements Rule { '
                         'ts.report(n, "function", "LM001", "minor"); }\n'
-                        'end _lmcode_\nsavedsl(p, ARGV[0]);\n', encoding='utf-8')
-        compiled = subprocess.run([COMPILER, str(rule), str(binary)], cwd=ROOT,
+                        'end _lmcode_\n', encoding='utf-8')
+        compiled = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(rule), str(binary)], cwd=ROOT,
                                   capture_output=True, timeout=30)
         self.assertEqual(compiled.returncode, 0, compiled.stderr)
         checked = self.run_host('check', '--lang', 'lmcode', binary, source)
@@ -169,8 +169,8 @@ class ScriptLanguages(unittest.TestCase):
         rule.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n'
                         '@function_declaration fn check(n: Node) -> void implements Rule { '
                         'ts.report(n, "function", "LS001", "minor"); }\n'
-                        'end _lmcode_\nsavedsl(p, ARGV[0]);\n', encoding='utf-8')
-        compiled = subprocess.run([COMPILER, str(rule), str(binary)], cwd=ROOT,
+                        'end _lmcode_\n', encoding='utf-8')
+        compiled = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(rule), str(binary)], cwd=ROOT,
                                   capture_output=True, timeout=30)
         self.assertEqual(compiled.returncode, 0, compiled.stderr)
         checked = self.run_host('check', '--lang', 'lmscript', binary, source)

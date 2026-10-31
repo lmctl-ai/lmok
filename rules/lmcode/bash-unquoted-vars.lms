@@ -38,4 +38,6 @@ fn unquoted_expansion(n: Node) -> void implements Rule {
 }
 
 end _lmcode_
-savedsl(p, "build/rules-lmcode/bash-unquoted-vars.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

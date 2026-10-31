@@ -36,4 +36,6 @@ println(ts.report_json());
 println(str(ts.report_count()) + " findings");
 
 end _lmcode_
-savedsl(p, "build/query-json.dslb");
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

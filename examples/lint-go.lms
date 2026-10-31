@@ -4,10 +4,7 @@
 # exit: 0
 # expect:
 #|go-tier1: 7 findings
-p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
-let probe = ts.parse("{}");
-end _lmcode_
 
-r = system ${dsl_cli(p)} lint rules/go-tier1.json tests/fixtures/go-tier1-violations.go;
+r = system(["lmok", "lint", "rules/go-tier1.json", "tests/fixtures/go-tier1-violations.go"]);
 assert(r.code == 0);
 println("go-tier1: " + str(count_matches(r.stdout, "\"rule\":")) + " findings");
