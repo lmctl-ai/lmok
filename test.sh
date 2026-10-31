@@ -1296,11 +1296,8 @@ out="$(cd "$WORK/revidx" && "$REVHOST" index --db t.db src)" || fail "revidx re-
 [ "$out" = "indexed 0 files (2 unchanged, 0 removed)" ] || fail "second index must see extracted rows as unchanged: $out"
 ok "index: files rows created by lint --db (no extraction) are indexed, not skipped as unchanged"
 
-for rev in -O/etc/passwd --quiet -; do
-  set +e; out="$("$HOST" lint examples/rules/c-security.json examples/data/sample.c "--changed=$rev" 2>&1)"; code=$?; set -e
-  [ "$code" = 2 ] && [[ "$out" == *"bad --changed revision '$rev' (must not start with '-')"* ]] || fail "--changed=$rev must be refused (exit $code): $out"
-done
-ok "lint --changed: option-looking revisions are refused (exit 2) instead of being parsed by git"
+# Literal option-looking --changed revisions are checked by the Python native-OS
+# oracle above; Bash/MSYS would rewrite /etc/passwd before invoking a native host.
 
 printf 'import { a as b, c } from "m";\nimport def, * as ns from "n";\n' > "$WORK/imports.js"
 cp "$WORK/imports.js" "$WORK/imports.ts"; cp "$WORK/imports.js" "$WORK/imports.tsx"

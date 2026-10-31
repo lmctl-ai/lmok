@@ -57,6 +57,12 @@ class NativeOS(unittest.TestCase):
         return result
     def exact(self, result, output, code=0, error=b''):
         self.assertEqual((result.returncode, result.stdout, result.stderr), (code, output, error))
+    def test_option_looking_changed_revision_is_literal(self):
+        # Construct these argv elements in Python: MSYS Bash rewrites the /etc
+        # fragment before a native executable can receive the security probe.
+        for rev in ('-O/etc/passwd','--quiet','-'):
+            self.exact(self.run_host('lint',ROOT/'examples/rules/c-security.json',ROOT/'examples/data/sample.c','--changed='+rev),
+                       b'',2,("bad --changed revision '"+rev+"' (must not start with '-')\n").encode())
     def test_go_cli_and_extension_dispatch(self):
         source = self.work / 'go input.go'
         # Pin both newline forms; native text writes would translate LF to CRLF.
