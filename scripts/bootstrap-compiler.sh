@@ -30,9 +30,10 @@ if [ ! -x "$dest/lmscript/bin/lmscript" ]; then
   (cd "$tmp/mono" && npm ci --ignore-scripts --no-audit --no-fund >&2 && npm run build >&2)
   [ -x "$tmp/mono/lmscript/bin/lmscript" ] || { echo "error: mono build produced no lmscript binary" >&2; exit 2; }
   mkdir -p "$cache"
-  rm -rf "$dest.partial"
-  mv "$tmp/mono" "$dest.partial"
-  mv "$dest.partial" "$dest"   # atomic publish
+  rm -rf "$dest.partial.$$"
+  mv "$tmp/mono" "$dest.partial.$$"
+  mv "$dest.partial.$$" "$dest" 2>/dev/null || rm -rf "$dest.partial.$$"   # lost a race; winner's copy is fine
   rm -rf "$tmp"; trap - EXIT
 fi
+[ -x "$dest/lmscript/bin/lmscript" ] || { echo "error: compiler cache at $dest is incomplete; remove it and retry" >&2; exit 2; }
 printf '%s\n' "$dest/lmscript/bin/lmscript"
