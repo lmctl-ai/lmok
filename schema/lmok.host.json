@@ -214,6 +214,30 @@
             ],
             "returns": "Tree"
           }
+        ],
+        "db_files": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "string"
+          }
+        ],
+        "db_symbols": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "string"
+          }
+        ],
+        "db_refs": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "string"
+          }
         ]
       }
     },

@@ -68,7 +68,7 @@ class RulePacksOS(unittest.TestCase):
         # dispatches natively: violations fixture yields N>0 findings with the
         # full finding shape, and the count line matches the array length.
         packs = sorted((ROOT / 'rules/lmcode').glob('*.lms'))
-        self.assertEqual(len(packs), 14, packs)  # a new pack must be wired in here by glob, so pin the count
+        self.assertEqual(len(packs), 15, packs)  # a new pack must be wired in here by glob, so pin the count
         for pack in packs:
             with self.subTest(pack=pack.name):
                 header = [line[9:].split() for line in pack.read_text().splitlines() if line.startswith('# check: ')]
@@ -97,7 +97,16 @@ class RulePacksOS(unittest.TestCase):
                         self.assertEqual(sorted(finding), ['col', 'end_col', 'end_row', 'message', 'row', 'rule', 'severity'], finding)
                 else:
                     # Packs without a '# check:' header keep the body-only --lmcode path.
-                    result = self.run_host('--lmcode', binary, cwd=ROOT)
+                    db_args = []
+                    if pack.name == 'c-repowide-undefined-call.lms':
+                        db = self.work / 'rule.db'
+                        indexed = self.run_host('index', '--db', db, 'tests/fixtures/db-rule', cwd=ROOT)
+                        self.assertEqual(indexed.returncode, 0, indexed.stderr)
+                        db_args = ['--db', db]
+                    result = self.run_host('--lmcode', binary, *db_args, cwd=ROOT)
+                    if db_args:
+                        expected = ''.join(line[2:] + '\n' for line in pack.read_text().splitlines() if line.startswith('#|')).encode()
+                        self.assertEqual(result.stdout.split(b'{"host_summary":')[0], expected)
                     self.assertEqual(result.stderr, b'', result)
                     self.assertEqual(result.returncode, 0, result.stdout)
                     self.assertTrue(result.stdout.endswith(b'LMCODE_RETURN_BEGIN\n{"ok":true,"result":null}\nLMCODE_RETURN_END\n'), result.stdout)

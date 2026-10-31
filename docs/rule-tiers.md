@@ -7,7 +7,7 @@ See the [rule library and run commands](../rules/README.md) and
 [examples](../examples/README.md) for runnable entry points.
 
 Current main supports **11 languages**, with **15 JSON packs (100 entries)**
-and **14 lmcode programs**. The [complete pack table](../rules/README.md#pack-inventory)
+and **15 lmcode programs**. The [complete pack table](../rules/README.md#pack-inventory)
 includes C, JSON, Python, Bash, Java, Go, JavaScript, TypeScript, TSX, secrets
 and autofix packs. lmscript/lmcode currently have syntax and facts support
 without dedicated shipped JSON packs. The detailed C/JSON/Python/Bash tables
@@ -127,6 +127,7 @@ escape-split `string_content` nodes do not hide long source strings.
 | LBC108 | call to undefined function (same-file) | call set minus (defined + script-side libc whitelist) |
 | LBC109 | direct recursion | per-definition subtree query for self-calls |
 | LBC110 | call to a function defined in none of the input files | cross-file set union in lmcode (E4) |
+| LBC111 | call with no indexed C function definition | `ts.db_*` set difference; requires `lmok index` first; candidate calls scanned from C sources |
 | LBP101 | python function too long (>60 rows) | `@function_definition` + `end_row-start_row` arithmetic |
 | LBS101 | unquoted bash variable (`$x`/`${x}` outside a `string`) | `@simple_expansion`/`@expansion` + parent-chain walk (needs E2) |
 

@@ -72,7 +72,8 @@ Three delivery forms, by how much logic a rule needs:
   needs E1 query predicates) and `c-symbol-rules.lms` (LBC107 unused static
   function, LBC108 undefined call, LBC109 direct recursion — set algebra in
   lmcode, no host index needed), and `c-cross-file.lms` (LBC110 calls to
-  functions defined in none of the input files), plus
+  functions defined in none of the input files), `c-repowide-undefined-call.lms`
+  (LBC111 calls with no indexed C definition; requires `lmok index` first), plus
   `python-function-metrics.lms` (LBP101 function too long) and
   `bash-unquoted-vars.lms` (LBS101 unquoted variable — expansion node with
   no `string` ancestor, needs `Node.parent()`). In lmcode bytecode (DSLB v6), per-node files are
@@ -121,8 +122,9 @@ but no shipped tier-1 JSON packs yet.
 | [tsx-tier1.json](tsx-tier1.json) | tsx | 3 |
 | [typescript-tier1.json](typescript-tier1.json) | typescript | 3 |
 
-The **14 lmcode programs** add function metrics, C/Python cognitive complexity,
-switch/branch style, nesting, scanf-width checks, same-/cross-file symbol sets,
+The **15 lmcode programs** add function metrics, C/Python cognitive complexity,
+switch/branch style, nesting, scanf-width checks, same-/cross-file and indexed
+repository-wide symbol sets,
 JSON duplicate keys/values and object size, and Bash quoting checks. Secrets
 are heuristic, redacted shape checks; autofixes are deliberately narrow.
 
@@ -152,7 +154,7 @@ Expect LBC101 and LBC102 findings, `2 findings in tests/fixtures/c-logic-violati
 and a terminal `LMCODE_RETURN_BEGIN` / JSON envelope / `LMCODE_RETURN_END` frame.
 Output directories must exist before fixture export.
 
-Run all 14 rule programs against their fixtures:
+Run all 15 rule programs against their fixtures:
 
 ```sh
 for source in rules/lmcode/*.lms; do
@@ -160,6 +162,10 @@ for source in rules/lmcode/*.lms; do
   node scripts/compile-fixture.mjs "$source" "$bytecode" || exit 1
   spec="$(sed -n 's/^# check: //p' "$source")"
   case "$source" in
+    *c-repowide-undefined-call.lms)
+      build/lmok index --db build/rule-demo.db tests/fixtures/db-rule || exit 1
+      build/lmok --lmcode "$bytecode" --db build/rule-demo.db || exit 1
+      continue ;;
     *c-function-cognitive-complexity.lms) spec="c tests/fixtures/c-logic-violations.c" ;;
     *python-function-cognitive-complexity.lms) spec="python tests/fixtures/python-logic-violations.py" ;;
   esac
@@ -191,3 +197,27 @@ report the same `password` key.
 `./test.sh` compiles and runs every rule against its violations fixture
 (expected finding lines asserted) and a clean fixture (`[]` and `0 findings`
 asserted). No separate SDK checkout is required.
+
+### Indexed C calls (LBC111)
+
+`c-repowide-undefined-call.lms` requires `lmok index` first. It reads C file
+paths and function definitions from the DB, discovers candidate call names
+from those C sources, and queries indexed call sites by exact name. The three
+DB methods do not include an all-references iterator, so candidate discovery
+still parses C inputs; definition resolution and reported positions use the DB.
+Run from the same directory used to index relative paths, and re-index after edits:
+
+```sh
+build/lmok index --db build/repo.db tests/fixtures/db-rule
+node scripts/compile-fixture.mjs rules/lmcode/c-repowide-undefined-call.lms build/rules-lmcode/c-repowide-undefined-call.dslb
+build/lmok --lmcode build/rules-lmcode/c-repowide-undefined-call.dslb --db build/repo.db
+```
+
+This emits path-aware JSONL (LBC111, minor) and a finding count, followed by the
+normal invocation frame. It does not populate `ts.report`, SARIF, or a failing
+quality gate. The fixture reports `ghost_fn`, while `shared_helper` resolves in
+another C file and `printf` is covered by LBC108's unchanged libc whitelist.
+Python definitions do not satisfy C calls. This remains a name-set heuristic:
+static linkage, macros, conditional compilation, callbacks and external
+libraries beyond the whitelist are not resolved. An indexed definition with the
+same name can hide an unresolved call in a different scope or translation unit.

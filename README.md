@@ -10,7 +10,7 @@ lmcode bodies in `.lms` files remain opaque. No Node runtime is needed to
 run the standalone binary.
 
 - Parse/query source, extract facts, measure local metrics and token duplication.
-- Lint with **15 JSON packs (100 rule entries)** and **14 lmcode rule programs**;
+- Lint with **15 JSON packs (100 rule entries)** and **15 lmcode rule programs**;
   see the [complete pack inventory](rules/README.md#pack-inventory).
 - Build a local SQLite knowledge tree with `index`, `symbols`, `refs`,
   `findings` and `status`; `facts` also exports records without a DB.
@@ -482,10 +482,11 @@ packs (C, JSON, Python, Bash, Java, Go, JavaScript, TypeScript and TSX), four
 secrets packs (Bash, C, JSON, Python), and two autofix packs (Bash, C).
 See the [complete filename/count table](rules/README.md#pack-inventory).
 lmscript and lmcode have parsing/facts support but no shipped JSON pack.
-The **14 lmcode-native**
+The **15 lmcode-native**
 rules in `rules/lmcode/` cover checks that need logic (function metrics, switch/if style, duplicate JSON
 keys and sibling string values, object size, nesting depth via `Node.has_parent()`/`parent()`, scanf width via
-query predicates, same-file symbol rules via set algebra, unquoted bash
+query predicates, same-file symbol rules via set algebra, indexed repository-wide
+C calls ([LBC111](rules/README.md#indexed-c-calls-lbc111), requires `lmok index` first), unquoted bash
 variables via the parent chain). Since v0.4.0,
 trees are incremental: `Tree.edit(start, old_end, new_end)` records a
 byte-offset edit, `ts.reparse`/`ts.reparse_c(old, new_text)` re-parse against

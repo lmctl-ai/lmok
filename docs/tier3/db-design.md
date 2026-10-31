@@ -268,14 +268,24 @@ lmcode has no record type, `json_parse` is the decoder):
 - `ts.db_refs(name) -> string` —
   `[{"name","kind","path","start_row","start_col"}]`, exact name match.
 
-What this unlocks script-side (the point of the design): LBC108 ("call to
-undefined function") is currently same-file with a libc whitelist
-(`rules/lmcode/c-symbol-rules.lms`). Against the DB it becomes
-repo-wide in three lines of lmcode: `json_parse(ts.db_symbols("%"))` for the
-defined set, `json_parse(ts.db_refs(...))` per call name for the used set,
-StrMap difference as today — the E3 set-algebra pattern, just fed from disk
-instead of re-parsing. A DB miss (no `.lmok/`) is a located run-time error
-naming the fix ("run `lmok index` first"), exit 3.
+Shipped example: [LBC111](../../rules/lmcode/c-repowide-undefined-call.lms)
+uses `json_parse(ts.db_symbols("%"))` for C function definitions, collects
+candidate call names from the indexed C source paths, and calls `ts.db_refs(name)`
+for indexed call positions. The exact-name API cannot enumerate all references;
+candidate discovery still parses sources. The original three-line, no-reparse
+sketch needs an additional all-references API to be possible. Definitions and
+reported call sites are DB-backed; no definition query is re-run on source trees.
+
+Results use deterministic path/position order (files by path), integer zero-based
+positions, and JSON escaping for strings. Empty matches return `[]`. SQL values
+are bound parameters. Reads share a lazy read-only connection across the script
+invocation; scripts that never call a DB method need no index. `--db` follows a
+script selector, e.g. `lmok --lmcode rule.dslb --db index.db`; environment,
+project and XDG resolution match the verbs. Duplicate or empty `--db` options
+are usage errors (exit 2). DB miss, corruption or schema mismatch becomes a
+located runtime error (exit 3); missing DBs say "run `lmok index` first" and are
+not created. The schema additions change the host fingerprint: recompile older
+bytecode against the new schema.
 
 ## 5. Incrementality
 

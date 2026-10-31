@@ -95,6 +95,8 @@ struct Host {
   std::map<std::string, lmok::CompiledPattern> compiled_patterns; // "<grammar>\n<pattern>" -> compiled (ts.match_*)
   // Findings collected via ts.report share a multi-program invocation; check resets per input.
   std::vector<Finding> findings;
+  std::optional<std::string> db_path;
+  std::unique_ptr<lmok::Database> database; // lazy, read-only; shared across invocation parts
   bool include_metadata = false;
   bool no_suppress=false;
   std::map<const lmok::Tree *, lmok::Suppression> suppressions;
@@ -223,6 +225,54 @@ void register_host(dslvm::Registry &reg, Host &host) {
     std::cout << args[0].s << "\n";
     return Value::none();
   });
+
+  // Bind user strings, never interpolate SQL. Stable row/field order makes the
+  // JSON-array-string API reproducible. Translate DB errors into VM errors so
+  // the calling instruction supplies its source location and runtime exit 3.
+  const auto db_method = [&reg, &host](const char *name, const char *sql,
+                                      std::vector<std::string> fields, size_t numeric_begin,
+                                      size_t numeric_end) {
+    reg.method("Ts", name, {"string"}, "string",
+      [&host, sql, fields, numeric_begin, numeric_end](void *, Args &args) {
+        try {
+          if (!host.database) host.database = std::make_unique<lmok::Database>(
+              lmok::resolve_db_path(host.db_path), lmok::Database::Mode::ReadOnly);
+          auto query = host.database->prepare(sql);
+          query.bind(1, args[0].s);
+          std::ostringstream out;
+          out << '[';
+          bool first = true;
+          while (query.step()) {
+            if (!first) out << ',';
+            first = false;
+            out << '{';
+            for (size_t i = 0; i < fields.size(); ++i) {
+              if (i) out << ',';
+              out << '"' << fields[i] << "\":";
+              if (i >= numeric_begin && i < numeric_end) out << query.integer(static_cast<int>(i));
+              else out << '"' << json_escape(query.text(static_cast<int>(i))) << '"';
+            }
+            out << '}';
+          }
+          out << ']';
+          return Value::string(out.str());
+        } catch (const lmok::DbError &error) {
+          throw dslvm::Error(error.what());
+        }
+      });
+  };
+  db_method("db_files", "SELECT path,lang,sha256 FROM files WHERE ?1='' OR lang=?1 ORDER BY path",
+            {"path","lang","sha256"}, 0, 0);
+  db_method("db_symbols",
+            "SELECT s.name,s.kind,f.path,s.start_row,s.start_col,s.end_row,s.end_col,s.scope "
+            "FROM symbols s JOIN files f ON f.id=s.file_id WHERE s.name LIKE ?1 "
+            "ORDER BY f.path,s.start_row,s.start_col,s.name,s.kind,s.id",
+            {"name","kind","path","start_row","start_col","end_row","end_col","scope"}, 3, 7);
+  db_method("db_refs",
+            "SELECT r.name,r.kind,f.path,r.start_row,r.start_col "
+            "FROM refs r JOIN files f ON f.id=r.file_id WHERE r.name=?1 "
+            "ORDER BY f.path,r.start_row,r.start_col,r.kind,r.id",
+            {"name","kind","path","start_row","start_col"}, 3, 5);
 
   // The "ts" context object (type Ts) is the parse entry point: the DSL
   // compiler resolves ts.parse(...) as a method call on the context object.
@@ -613,7 +663,7 @@ static int run_cli(int argc, char **argv) {
       "       lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
       "       lmok metrics [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
       "       lmok dup [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--tokens N] FILE|DIR...\n"
-      "       lmok --lmcode FILE [--lmcode FILE ...]\n";
+      "       lmok --lmcode FILE [--lmcode FILE ...] [--db PATH]\n";
   if (argc>=2 && std::string(argv[1])=="rules") {
     if(argc<3){std::cerr<<"rules needs PACK...\n";return 2;}
     try {
@@ -1689,7 +1739,18 @@ static int run_cli(int argc, char **argv) {
   }
   if (argc >= 2 && (std::string(argv[1]) == "--lmcode"||std::string(argv[1])=="--first"||std::string(argv[1])=="--last")) {
     std::vector<std::string> files;std::vector<int> priorities;
-    for(int i=1;i<argc;i+=2){std::string flag=argv[i];if(i+1>=argc||(flag!="--lmcode"&&flag!="--first"&&flag!="--last"))return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));files.emplace_back(argv[i+1]);priorities.push_back(flag=="--first"?0:flag=="--last"?2:1);}
+    for (int i = 1; i < argc; i += 2) {
+      const std::string flag = argv[i];
+      if (i + 1 >= argc) return dslvm::failure_frame("cli", dslvm::Error("CLI_USAGE", usage));
+      if (flag == "--db") {
+        if (host.db_path || !*argv[i + 1])
+          return dslvm::failure_frame("cli", dslvm::Error("CLI_USAGE", "--db needs one nonempty path"));
+        host.db_path = argv[i + 1];
+      } else if (flag == "--lmcode" || flag == "--first" || flag == "--last") {
+        files.emplace_back(argv[i + 1]);
+        priorities.push_back(flag == "--first" ? 0 : flag == "--last" ? 2 : 1);
+      } else return dslvm::failure_frame("cli", dslvm::Error("CLI_USAGE", usage));
+    }
     try{
       auto results=dslvm::InvocationResults::from_command(files);
       const std::string schema(reinterpret_cast<const char*>(lmok::embedded_schema),lmok::embedded_schema_size);

@@ -2,8 +2,10 @@
 
 Status (2026-10-31): the storage spike is shipped. `facts`, `index`, `symbols`,
 `refs`, `findings`, `status`, `outline` and `lint --db` work on current main; facts/parser
-coverage is 11 languages. `find`, trigram search and the `ts.db_*`
-builtins below remain proposals. See the [verified journey](../user-journey-review.md).
+coverage is 11 languages. The `ts.db_files`, `ts.db_symbols` and `ts.db_refs`
+lmcode methods are shipped, with `--lmcode FILE --db PATH` support and
+[LBC111](../../rules/README.md#indexed-c-calls-lbc111) as the repository-wide C example.
+`find` and trigram search remain proposals. See the [verified journey](../user-journey-review.md).
 The rest of this document records the original architecture and phasing. Inputs:
 `deep-analysis.md` (Fable), `local-index-survey.md` (Astra1), `db-design.md`
 (Kimi2). Owner framing: NOT SonarQube parity; half exact knowledge tree, half
@@ -36,7 +38,8 @@ Access surfaces: CLI verbs (`index`, `symbols`, `refs`, `find`, `findings`,
 `status`, `lint --db`) AND lmcode builtins (`ts.db_files/db_symbols/db_refs`,
 JSON-array-string returns per the `ts.report_json` precedent) so user rules
 become repo-wide without host changes — LBC108 goes from same-file to
-whole-repo in ~3 lines of lmcode set algebra.
+whole-repo with indexed definition/ref sets. Exact-name reference lookup still
+needs candidate call names from the source CST; see LBC111 for that explicit boundary.
 
 ## Reconciliations between the three docs
 

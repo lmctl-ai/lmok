@@ -966,7 +966,7 @@ python3 tests/check-patterns.py "$HOST" || fail "pattern compiler cases"
 ok "patterns: code-shaped patterns compile to pinned queries; root matches and exit-2 diagnostics byte-exact"
 ok "native OS byte/path/linkage contracts and negative controls"
 python3 tests/check-rules-os.py "$HOST" --prove-controls || fail "rule pack OS oracles"
-ok "rule packs per OS: all twelve converted packs, CRLF/no-newline/unicode fixtures, anonymous kinds, argument order"
+ok "rule packs per OS: all fifteen lmcode programs, CRLF/no-newline/unicode fixtures, anonymous kinds, argument order"
 # --- SQLite DB layer (keep additive checks at the end) ---
 cmake --build "$BUILD_DIR" --target lmok_db_test -j2 >"$WORK/db-build.log" 2>&1 ||
   { cat "$WORK/db-build.log" >&2; fail "DB wrapper test build"; }
@@ -1308,5 +1308,13 @@ ok "facts: import bindings — JS/TS/TSX aliased specifiers bind the alias only;
 out="$("$BUILD_DIR/lmok_db_test" "$WORK/index-plan.db" --index-plan)" || fail "index extraction lookup plan"
 [ "$out" = "index lookup: one uncorrelated FTS scan, placeholder/empty/duplicate controls" ] || fail "index plan output: $out"
 ok "index extraction lookup materializes FTS paths once; old correlated plan rejected"
+
+# --- indexed lmcode API and repo-wide C rule (schema additions recompile chunks) ---
+python3 tests/check-db-lmcode.py "$HOST" "$WORK" surface || fail "DB lmcode surface"
+ok "Ts DB JSON contracts, bound filters, explicit/env/project precedence and shared invocation"
+python3 tests/check-db-lmcode.py "$HOST" "$WORK" errors || fail "DB lmcode errors"
+ok "Ts DB missing/corrupt errors are located exit 3; script --db validation and lazy access"
+python3 tests/check-db-lmcode.py "$HOST" "$WORK" rule || fail "DB lmcode rule"
+ok "LBC111 byte-exact indexed C findings, cross-file resolution and language controls"
 
 echo "PASS: $pass checks"

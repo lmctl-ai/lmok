@@ -1,0 +1,53 @@
+# Chapter: Rules (lmcode) - indexed repository-wide undefined C calls
+# Shows: db_files/db_symbols/db_refs, JSON arrays and StrMap set difference
+# Run: lmok index tests/fixtures/db-rule; compile this file; lmok --lmcode rule.dslb
+# dispatch: body-only indexed repository rule (use --lmcode, not check)
+# Needs: lmok index first; run from the directory used to index relative paths
+# exit: 0
+# expect:
+#|{"path":"tests/fixtures/db-rule/a.c","row":2,"col":28,"rule":"LBC111","severity":"minor","name":"ghost_fn","message":"call to undefined function (indexed C repository)"}
+#|1 findings
+p = _lmcode_ cli="lmok";
+
+# Exact-name db_refs cannot enumerate call names. Discover candidates from
+# current C inputs once; definitions and reported call sites come from the DB.
+# Re-index after edits. This is a name-set heuristic, not C linkage resolution:
+# external libraries outside the whitelist, macros, conditional compilation,
+# function pointers and same-named static functions need human review.
+let c_files = str_map();
+let called = str_map();
+for (f in json_parse(ts.db_files("c"))) {
+  let path = f.get("path").as_string();
+  c_files.set(path, "1");
+  let tree = ts.parse_c(file_read(path));
+  for (call in ts.query_c(tree.root(), "(call_expression function: (identifier) @fn)")) {
+    called.set(call.text(), "1");
+  }
+}
+let defined = str_map();
+for (s in json_parse(ts.db_symbols("%"))) {
+  if (s.get("kind").as_string() == "function" && c_files.has(s.get("path").as_string())) {
+    defined.set(s.get("name").as_string(), "1");
+  }
+}
+let libc = "|exit|fgets|free|malloc|printf|putchar|puts|snprintf|strcat|strcmp|strcpy|strlen|strncpy|";
+let count = 0;
+# Names retain first-seen path/source order; db_refs rows use source order.
+let names = called.keys();
+for (name in names) {
+  if (!defined.has(name) && !str_contains(libc, "|" + name + "|")) {
+    for (r in json_parse(ts.db_refs(name))) {
+      if (r.get("kind").as_string() == "call" && c_files.has(r.get("path").as_string())) {
+        # DB refs have positions rather than Node handles. Emit path-aware JSONL
+        # directly; these are not ts.report/SARIF findings or a failing gate.
+        println("{\"path\":" + r.get("path").to_json() + ",\"row\":" + r.get("start_row").to_json() + ",\"col\":" + r.get("start_col").to_json() + ",\"rule\":\"LBC111\",\"severity\":\"minor\",\"name\":" + r.get("name").to_json() + ",\"message\":\"call to undefined function (indexed C repository)\"}");
+        count = count + 1;
+      }
+    }
+  }
+}
+println(str(count) + " findings");
+
+end _lmcode_
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");
