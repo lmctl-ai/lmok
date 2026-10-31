@@ -104,3 +104,9 @@ and CI artifact names use `lmok`.
 **E9 landed:** [`lmok outline`](outline.md) uses live facts for definitions
 and an optional read-only DB for reference-name ranking, with a whole-block
 line budget. No daemon or DB is required.
+
+## Measured scale
+
+[Scale validation](scale-validation.md) records cold/warm/1% indexing, query
+latency, resource stress, and a subsecond timestamp invalidation fix. Cold curl
+indexing exceeded 10 seconds; the mixed corpus exceeded the DB-size target.
