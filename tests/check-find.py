@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Search oracles use only temporary files/DBs; native output is compared as bytes."""
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 import os
 from contextlib import closing
 import sqlite3
@@ -111,8 +111,10 @@ with tempfile.TemporaryDirectory(prefix='lmok-find-') as temp:
         assert find('foo(').stdout.endswith(b'src/bytes.c:0:5: // \xff foo(\x00 foo(\nsrc/bytes.c:0:11: // \xff foo(\x00 foo(\n')
         # A unique needle after NUL must survive FTS tokenizer truncation.
         # NUL.c is a Windows device, so use an ordinary filename for these bytes.
-        assert not PureWindowsPath('embedded-nul.c').is_reserved(), 'fixture must be a real file on Windows'
-        (root / 'src/embedded-nul.c').write_bytes(b'// prefix\x00 only_after_nul\n')
+        nul_source=root / 'src/embedded-nul.c'
+        nul_bytes=b'// prefix\x00 only_after_nul\n'
+        nul_source.write_bytes(nul_bytes)
+        assert nul_source.read_bytes()==nul_bytes, 'fixture must retain its bytes in a real file'
         run('index', 'src', '--db', 'index.db')
         p = find('only_after_nul')
         assert p.stdout == b'src/embedded-nul.c:0:11: // prefix\x00 only_after_nul\n' and b'scanning stored byte-text' in p.stderr, (p.stdout,p.stderr)
