@@ -34,6 +34,7 @@
 #include <iostream>
 #include <memory>
 #include <map>
+#include <optional>
 #include <set>
 #include <unordered_map>
 #include <sstream>
@@ -665,11 +666,40 @@ static int run_cli(int argc, char **argv) {
   _setmode(_fileno(stdout), _O_BINARY);
   _setmode(_fileno(stderr), _O_BINARY);
 #endif
-  Host host;
   std::vector<char *> metadata_argv;
   const bool metadata_verb=argc>=2&&(std::string(argv[1])=="lint"||std::string(argv[1])=="ci"||std::string(argv[1])=="check"||std::string(argv[1])=="--lmcode"||std::string(argv[1])=="--first"||std::string(argv[1])=="--last");
-  for(int i=0;i<argc;++i){if(metadata_verb&&i>=2&&std::string(argv[i])=="--metadata")host.include_metadata=true;else metadata_argv.push_back(argv[i]);}
+  bool include_metadata=false;
+  for(int i=0;i<argc;++i){if(metadata_verb&&i>=2&&std::string(argv[i])=="--metadata")include_metadata=true;else metadata_argv.push_back(argv[i]);}
   argc=static_cast<int>(metadata_argv.size());argv=metadata_argv.data();
+  std::optional<dslvm::InvocationResults> invocation_preflight;
+  try {
+    if(argc>=2&&std::string(argv[1])=="check") {
+      std::vector<std::string> positional;bool valid=true;
+      for(int i=2;i<argc;++i){const std::string arg=argv[i];
+        if(arg=="--no-suppress")continue;
+        if(arg=="--lang"||arg=="--sarif"){if(i+1>=argc||std::string(argv[i+1]).rfind("--",0)==0){valid=false;break;}++i;continue;}
+        if(arg.rfind("--",0)==0){valid=false;break;}
+        positional.push_back(arg);
+      }
+      if(valid&&positional.size()>=2)invocation_preflight.emplace(dslvm::InvocationResults::from_command({positional[0]}));
+    } else if(argc>=2&&(std::string(argv[1])=="--lmcode"||std::string(argv[1])=="--first"||std::string(argv[1])=="--last")) {
+      std::vector<std::string> files;bool valid=true;
+      for(int i=1;i<argc;){const std::string flag=argv[i];
+        if(i+1>=argc){valid=false;break;}
+        if(flag=="--db"){i+=2;continue;}
+        if(flag=="--lmcode"||flag=="--first"||flag=="--last")files.emplace_back(argv[i+1]);
+        else {valid=false;break;}
+        i+=2;
+      }
+      if(valid&&!files.empty())invocation_preflight.emplace(dslvm::InvocationResults::from_command(files));
+    }
+  } catch(const dslvm::Error& error) { return dslvm::failure_frame("cli",error); }
+  auto invocation_results=[&](const std::vector<std::string>& files){
+    if(invocation_preflight){auto results=std::move(*invocation_preflight);invocation_preflight.reset();return results;}
+    return dslvm::InvocationResults::from_command(files);
+  };
+  Host host;
+  host.include_metadata=include_metadata;
   dslvm::Registry reg;
   register_host(reg, host);
   const std::string usage =
@@ -1722,7 +1752,7 @@ static int run_cli(int argc, char **argv) {
     }
     if (check_inputs.size() < 2) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));
     const std::string schema(reinterpret_cast<const char *>(lmok::embedded_schema), lmok::embedded_schema_size);
-    auto results=dslvm::InvocationResults::from_command({check_inputs[0]});
+    auto results=invocation_results({check_inputs[0]});
     const auto fail_check=[&](const std::string& phase,const dslvm::Error& error){results.fail(0,phase,error);return results.write_frame(std::cout);};
     dslvm::Program program;
     try { program = dslvm::Program::load(read_bytecode(check_inputs[0]), schema, reg); }
@@ -1743,6 +1773,7 @@ static int run_cli(int argc, char **argv) {
     }
     dslvm::Context context;
     context.set("ts", &host);
+    context.set_dry(results.dry());
     // One output group per findings sink: the JSON array, then `N findings in WHERE` (the same line `lint`
     // prints, WHERE = the input path as given, or `body`), then the success record. Body findings are their own
     // group, printed only when the body reported something (WP14 F2). When an entry fails mid-walk the group
@@ -1827,10 +1858,10 @@ static int run_cli(int argc, char **argv) {
       } else return dslvm::failure_frame("cli", dslvm::Error("CLI_USAGE", usage));
     }
     try{
-      auto results=dslvm::InvocationResults::from_command(files);
+      auto results=invocation_results(files);
       const std::string schema(reinterpret_cast<const char*>(lmok::embedded_schema),lmok::embedded_schema_size);
       const auto contract=dslvm::ResultContract::from_schema(schema);
-      dslvm::Context context;context.set("ts",&host);
+      dslvm::Context context;context.set("ts",&host);context.set_dry(results.dry());
       std::vector<size_t> order;for(size_t i=0;i<files.size();++i)order.push_back(i);
       std::stable_sort(order.begin(),order.end(),[&](size_t a,size_t b){return priorities[a]<priorities[b];});
       for(size_t position:order){const auto& part=results.registrations()[position];std::string phase="load";

@@ -61,6 +61,8 @@ cmake --build "$BUILD_DIR" -j2 >"$WORK/build.log" 2>&1 ||
   { grep -n -B 3 -A 4 "error:" "$WORK/build.log" >&2 || true; tail -30 "$WORK/build.log" >&2; fail "cmake build ($BUILD_DIR)"; }
 ok "host build ($BUILD_DIR)"
 python3 tests/check-host-flags.py schema/lmok.dsl.json "$HOST" || fail "hard host flag cutover"
+python3 tests/check-dry-adoption.py "$HOST" || fail "lmcode dry manifest adoption"
+ok "lmcode dry manifest is resolved before setup; --lmcode/check skip file-write effects and preserve real mode"
 
 want_version="lmok $(sed -n 's/^project(lmok VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
 [ "$("$HOST" --version)" = "$want_version" ] || fail "--version prints $want_version"

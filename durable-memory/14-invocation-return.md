@@ -26,3 +26,12 @@ findings/SARIF exact oracles and retained return/entry controls. tests/mutate-in
 kills lost-summary/reset-context/wrong-slot plus real subprocess-per-file faults.
 scripts/test-return-controls.py retains five compiled framing/entry/SARIF mutants.
 No releases while other sample adapters remain on the previous envelope protocol.
+
+## Dry host adoption (H6)
+
+The vendored lmcode-cpp SDK pin includes H0 dry callback slots and required
+version-1 `dry` metadata. `--lmcode` and `check` validate that metadata before
+constructing Host/registering callbacks, then propagate its mode into Context.
+No metadata means real mode. The offline `tests/check-dry-adoption.py` exercises
+both commands with a file-write sentinel and confirms the result sink still
+produces the expected payload.

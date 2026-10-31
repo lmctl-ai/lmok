@@ -254,6 +254,13 @@ Tagged host_summary diagnostics preserve completed-program/input summaries. Runt
 IDs, order, suppression and entry HALT values retain their existing meanings.
 The [body/entry return example](examples/invocation-return.lmcode) uses the pinned source compiler from `compiler.lock`. See [invocation ownership and compiler staging](durable-memory/14-invocation-return.md).
 
+Version-1 `LMCODE_INVOCATION_FILE` metadata requires a boolean `dry`. For `--lmcode`
+and `check`, lmok parses the selected program's manifest before constructing its
+host or registering callbacks, then copies the mode into the VM context. Without a
+manifest the invocation is real. Offline adoption controls exercise both paths:
+`file_write` must leave its sentinel absent in dry mode, while real mode writes it;
+the return sink still runs and both commands emit the correct mode marker.
+
 ## Local database status
 
 ```sh
