@@ -55,7 +55,7 @@ class ReturnChecks(unittest.TestCase):
             + "savedsl(p, ARGV[0]);\n",
             encoding="utf-8", newline="\n",
         )
-        result = subprocess.run([*compiler_argv(), str(source), str(bytecode)], capture_output=True, text=True)
+        result = subprocess.run(["node", str(ROOT/"scripts/compile-fixture.mjs"), str(source), str(bytecode)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         return bytecode
 
@@ -74,7 +74,7 @@ class ReturnChecks(unittest.TestCase):
         self.assertGreaterEqual(len(lines), 3, repr(output))
         self.assertEqual(lines[-3], "LMCODE_RETURN_BEGIN", repr(output))
         self.assertEqual(lines[-1], "LMCODE_RETURN_END", repr(output))
-        return json.loads(lines[-2])
+        envelope=json.loads(lines[-2]);self.assertTrue(envelope["ok"]);return envelope["result"]
 
     def test_body_float_uses_shortest_round_trip_frame(self):
         binary = self.compile("lmcode_return_set(0.1 + 0.2);", "float")
@@ -82,7 +82,7 @@ class ReturnChecks(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertTrue(result.stdout.endswith("LMCODE_RETURN_END\n"), repr(result.stdout))
         self.assertEqual(self.frame(result.stdout), 0.30000000000000004)
-        self.assertTrue(result.stdout.endswith("LMCODE_RETURN_BEGIN\n0.30000000000000004\nLMCODE_RETURN_END\n"))
+        self.assertTrue(result.stdout.endswith("LMCODE_RETURN_BEGIN\n{\"ok\":true,\"result\":0.30000000000000004}\nLMCODE_RETURN_END\n"))
 
     def test_unset_result_is_null_frame(self):
         binary = self.compile("let untouched = 1;", "unset")
@@ -119,15 +119,15 @@ class ReturnChecks(unittest.TestCase):
         target.write_text('{"value":1}', encoding="utf-8")
         result = self.host_run("check", "--lang", "json", binary, target)
         self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("LMCODE_RETURN_BEGIN", result.stdout)
+        self.assertFalse(json.loads(result.stdout.splitlines()[-2])["ok"]);self.assertNotIn("result",json.loads(result.stdout.splitlines()[-2]))
 
     def test_scalar_field_failure_has_no_frame(self):
         binary = self.compile('lmcode_return_set(7); lmcode_return_put("field", 1);', "scalar")
         result = self.host_run("--lmcode", binary)
         self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("LMCODE_RETURN_BEGIN", result.stdout)
+        self.assertFalse(json.loads(result.stdout.splitlines()[-2])["ok"]);self.assertNotIn("result",json.loads(result.stdout.splitlines()[-2]))
 
-    def test_dsl_does_not_dispatch_rule_entries(self):
+    def test_lmcode_does_not_dispatch_rule_entries(self):
         binary = self.compile(
             'lmcode_return_put("body", "yes");\n'
             '@pair fn entry(n: Node) -> void implements Rule {\n'
@@ -143,12 +143,11 @@ class ReturnChecks(unittest.TestCase):
         first = self.compile('lmcode_return_set("first");', "first")
         second = self.compile('lmcode_return_set("second");', "second")
         unset = self.compile("let untouched = 1;", "between")
-        result = self.host_run("--lmcode", first, unset, second)
+        result = self.host_run("--lmcode", first,"--lmcode", unset,"--lmcode", second)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-        self.assertEqual(result.stdout.count("LMCODE_RETURN_BEGIN\n"), 3)
-        self.assertEqual(result.stdout.count("LMCODE_RETURN_END\n"), 3)
-        payloads = [line for line in result.stdout.splitlines() if line in ('"first"', 'null', '"second"')]
-        self.assertEqual(payloads, ['"first"', 'null', '"second"'])
+        self.assertEqual(result.stdout.count("LMCODE_RETURN_BEGIN\n"), 1)
+        self.assertEqual(result.stdout.count("LMCODE_RETURN_END\n"), 1)
+        self.assertEqual(self.frame(result.stdout), ["first",None,"second"])
 
     def test_owned_collection_survives_entry_and_multiple_nodes(self):
         binary = self.compile(
@@ -176,12 +175,12 @@ class ReturnChecks(unittest.TestCase):
         sarif = self.work / "result.sarif"
         result = self.host_run("check", "--lang", "json", binary, target, "--sarif", sarif)
         self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("LMCODE_RETURN_BEGIN", result.stdout)
+        self.assertFalse(json.loads(result.stdout.splitlines()[-2])["ok"]);self.assertNotIn("result",json.loads(result.stdout.splitlines()[-2]))
 
     def test_real_return_syntax_body_fixture(self):
         result = self.host_run("--lmcode", ROOT / "tests/fixtures/returns/body.dslb")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-        self.assertEqual(result.stdout, '{"ok": true, "result": null}\nLMCODE_RETURN_BEGIN\n0.30000000000000004\nLMCODE_RETURN_END\n')
+        self.assertEqual(self.frame(result.stdout),0.30000000000000004);self.assertIn("host_summary",result.stdout)
 
     def test_real_return_entries_across_files_and_sarif_order(self):
         first, second = self.work / "first.json", self.work / "second.json"
@@ -202,13 +201,13 @@ class ReturnChecks(unittest.TestCase):
         target.write_bytes(b'{"x":1}')
         result = self.host_run("check", ROOT / "tests/fixtures/returns/entry-error.dslb", target)
         self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
-        self.assertNotIn("LMCODE_RETURN_BEGIN", result.stdout)
+        self.assertFalse(json.loads(result.stdout.splitlines()[-2])["ok"]);self.assertNotIn("result",json.loads(result.stdout.splitlines()[-2]))
         self.assertIn("RUN_HOST", result.stdout)
         # A directory is an invalid SARIF destination on native OSes. This is an
         # application failure after successful body/entries, so it cannot frame.
         result = self.host_run("check", ROOT / "tests/fixtures/returns/entry.dslb", target, "--sarif", self.work)
-        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
-        self.assertNotIn("LMCODE_RETURN_BEGIN", result.stdout)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertFalse(json.loads(result.stdout.splitlines()[-2])["ok"]);self.assertNotIn("result",json.loads(result.stdout.splitlines()[-2]))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

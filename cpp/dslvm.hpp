@@ -23,7 +23,7 @@
 //   dslvm::Program::call(entry, context, registry, args, stats)   executes one entry with args stored into its parameter
 //                                        locals; returns the stack value at HALT (Value::none() for a void interface)
 //   dslvm::Program::RunStats             optional dispatch count for host measurements; pass a pointer to run(), never a limit
-//   dslvm::report_ok / report_error / report_app_failure   the standard one-line JSON result on stdout and the
+//   dslvm::InvocationResults / failure_frame               explicit one-envelope result framing and the
 //                                        exit-code convention 2 compile (lmscript) / 3 host (load or run) / 4 application
 //   dslvm::VERSION                       the bytecode format version this SDK reads (and nothing else: no backward compatibility)
 //   dslvm::sha256 / hex / read_file      helpers the hosts use for the schema binding and files
@@ -344,18 +344,6 @@ inline std::string args_to_json(const Args& args) {
   out.push_back(']');
   return out;
 }
-// ---- The standard result line: exactly one JSON line on stdout; the return value is the process exit code. ----
-// `result_json` must already be JSON text ("null", "42", json_escape(text), an object...).
-inline int report_ok(const std::string& result_json = "null") { std::cout << "{\"ok\": true, \"result\": " << result_json << "}" << std::endl; return 0; }
-// phase is "load" or "run" (compile failures are lmscript's, exit 2); exit 4 for APP_FAIL, else 3.
-inline int report_error(const std::string& phase, const Error& e) {
-  std::cout << "{\"ok\": false, \"phase\": " << json_escape(phase) << ", \"code\": " << json_escape(e.code) << ", \"message\": " << json_escape(e.what());
-  if (e.has_location) { std::cout << ", \"line\": " << e.line; if (e.has_column) std::cout << ", \"column\": " << e.column; }
-  std::cout << "}" << std::endl;
-  return e.code == "APP_FAIL" ? 4 : 3;
-}
-inline int report_app_failure(const std::string& message) { return report_error("app", Error("APP_FAIL", message)); }
-
 // ---- Per-run context: the host's live objects, by declared name ----
 class Context {
  public:

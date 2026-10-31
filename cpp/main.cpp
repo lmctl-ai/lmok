@@ -91,7 +91,7 @@ struct Host {
   }
   std::vector<std::unique_ptr<lmok::NodeList>> node_lists;
   std::map<std::string, lmok::CompiledPattern> compiled_patterns; // "<grammar>\n<pattern>" -> compiled (ts.match_*)
-  // Findings collected via ts.report; reset per --lmcode file (see the run loop).
+  // Findings collected via ts.report share a multi-program invocation; check resets per input.
   std::vector<Finding> findings;
   bool include_metadata = false;
   bool no_suppress=false;
@@ -588,22 +588,11 @@ static int run_cli(int argc, char **argv) {
 #endif
   Host host;
   std::vector<char *> metadata_argv;
-  const bool metadata_verb=argc>=2&&(std::string(argv[1])=="lint"||std::string(argv[1])=="ci"||std::string(argv[1])=="check"||std::string(argv[1])=="--lmcode");
+  const bool metadata_verb=argc>=2&&(std::string(argv[1])=="lint"||std::string(argv[1])=="ci"||std::string(argv[1])=="check"||std::string(argv[1])=="--lmcode"||std::string(argv[1])=="--first"||std::string(argv[1])=="--last");
   for(int i=0;i<argc;++i){if(metadata_verb&&i>=2&&std::string(argv[i])=="--metadata")host.include_metadata=true;else metadata_argv.push_back(argv[i]);}
   argc=static_cast<int>(metadata_argv.size());argv=metadata_argv.data();
   dslvm::Registry reg;
   register_host(reg, host);
-  // One sink per logical invocation, outside every per-file/per-call arena.
-  dslvm::ResultSink invocation_result;
-  reg.set_result_sink(&invocation_result);
-  const auto emit_result = [&]() {
-    try { dslvm::write_result_frame(std::cout, invocation_result); }
-    catch (const std::exception &error) {
-      std::cerr << "return output: " << error.what() << "\n";
-      return 4;
-    }
-    return 0;
-  };
   const std::string usage =
       "usage: lmok --version | --notices | --lmcode-schema [--json] | --lmcode-signatures\n"
       "       lmok status [--db PATH] [--init]\n"
@@ -1478,6 +1467,7 @@ static int run_cli(int argc, char **argv) {
     return std::cout ? 0 : 4;
   }
   if (argc >= 2 && std::string(argv[1]) == "check") {
+    try {
     std::vector<char *> check_argv;
     for(int i=0;i<argc;++i){if(i>=2 && std::string(argv[i])=="--no-suppress")host.no_suppress=true;else check_argv.push_back(argv[i]);}
     argc=static_cast<int>(check_argv.size());argv=check_argv.data();
@@ -1504,20 +1494,22 @@ static int run_cli(int argc, char **argv) {
     }
     if (check_inputs.size() < 2) { std::cerr << usage; return 2; }
     const std::string schema(reinterpret_cast<const char *>(lmok::embedded_schema), lmok::embedded_schema_size);
+    auto results=dslvm::InvocationResults::from_command({check_inputs[0]});
+    const auto fail_check=[&](const std::string& phase,const dslvm::Error& error){results.fail(0,phase,error);return results.write_frame(std::cout);};
     dslvm::Program program;
     try { program = dslvm::Program::load(read_bytecode(check_inputs[0]), schema, reg); }
-    catch (const dslvm::Error &error) { return dslvm::report_error("load", error); }
+    catch (const dslvm::Error &error) { return fail_check("load", error); }
     std::vector<Target> check_targets;
     if(const int rc=expand_targets(std::vector<std::string>(check_inputs.begin()+1,check_inputs.end()),0,check_targets,&grammar))return rc;
     std::map<std::string, std::vector<size_t>> by_kind;
     for (size_t i = 0; i < program.entries().size(); ++i) {
       const auto &entry = program.entries()[i];
       if (entry.iface != "interface Rule(Node) -> void") {
-        return dslvm::report_error("load", dslvm::Error("LOAD_BAD_BYTECODE", "check entry '" + entry.name + "' must implement Rule(Node) -> void"));
+        return fail_check("load", dslvm::Error("LOAD_BAD_BYTECODE", "check entry '" + entry.name + "' must implement Rule(Node) -> void"));
       }
       const std::string problem = lmok::annotation_problem(grammar, entry.annotation);
       if (!problem.empty()) {
-        return dslvm::report_error("load", dslvm::Error("LOAD_UNBOUND", "check entry '" + entry.name + "': annotation '@" + entry.annotation + "' " + problem));
+        return fail_check("load", dslvm::Error("LOAD_UNBOUND", "check entry '" + entry.name + "': annotation '@" + entry.annotation + "' " + problem));
       }
       by_kind[entry.annotation].push_back(i); // duplicate kinds retain source order
     }
@@ -1539,7 +1531,7 @@ static int run_cli(int argc, char **argv) {
         sarif_results.push_back({f.rule, f.severity, f.message, uri, f.row, f.col, f.end_row, f.end_col, f.metadata, source});
     };
     try {
-      invocation_result.reset(); // body + every selected entry across all inputs
+      results.select(0,reg,dslvm::ResultContract::from_schema(schema)); // body + entries across inputs
       program.run(context, reg); // configuration/effects once, not once per node or file
       if (!host.findings.empty() || host.suppressed_count()) { collect_sarif(""); print_group("body"); }
       for (const auto &target : check_targets) {
@@ -1558,15 +1550,15 @@ static int run_cli(int argc, char **argv) {
         });
         collect_sarif(target.path, sarif_path ? std::make_shared<const std::string>(tree.source()) : nullptr);
         print_group(where);
-        dslvm::report_ok();
+        std::cout << "{\"host_summary\":{\"input\":" << dslvm::json_escape(where) << "}}\n";
         if (!std::cout) return 4;
       }
     } catch (const dslvm::Error &error) {
       if (where != std::string("body") || !host.findings.empty() || host.suppressed_count()) print_group(where);
-      return dslvm::report_error("run", error);
+      return fail_check("run", error);
     } catch (const std::exception &error) {
       if (where != std::string("body") || !host.findings.empty() || host.suppressed_count()) print_group(where);
-      return dslvm::report_error("run", dslvm::Error("RUN_HOST", error.what()));
+      return fail_check("run", dslvm::Error("RUN_HOST", error.what()));
     }
     if (sarif_path) {
       // driver.rules: distinct rule ids in first-seen order, derived from the
@@ -1582,47 +1574,34 @@ static int run_cli(int argc, char **argv) {
       }
       if (const int rc = write_sarif_file(*sarif_path,
                                           lmok::sarif_log(LMOK_VERSION, sarif_rules, sarif_results, json_escape)))
-        return rc;
+        {results.fail(std::nullopt,"app",dslvm::Error("APP_FAIL","cannot write SARIF"));return results.write_frame(std::cout);}
     }
-    return emit_result(); // SARIF/application validation completed; errors above never frame
+    try{results.complete(0);}catch(const dslvm::Error& e){results.fail(0,"run",e);}
+    return results.write_frame(std::cout);
+    }catch(const dslvm::Error& error){return dslvm::failure_frame("cli",error);}
   }
-  if (argc >= 3 && std::string(argv[1]) == "--lmcode") {
-    for (int i = 2; i < argc; ++i) {
-      if (std::string(argv[i]).empty() || std::string(argv[i]).rfind("--", 0) == 0) {
-        std::cerr << usage;
-        return 2;
+  if (argc >= 2 && (std::string(argv[1]) == "--lmcode"||std::string(argv[1])=="--first"||std::string(argv[1])=="--last")) {
+    std::vector<std::string> files;std::vector<int> priorities;
+    for(int i=1;i<argc;i+=2){std::string flag=argv[i];if(i+1>=argc||(flag!="--lmcode"&&flag!="--first"&&flag!="--last"))return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));files.emplace_back(argv[i+1]);priorities.push_back(flag=="--first"?0:flag=="--last"?2:1);}
+    try{
+      auto results=dslvm::InvocationResults::from_command(files);
+      const std::string schema(reinterpret_cast<const char*>(lmok::embedded_schema),lmok::embedded_schema_size);
+      const auto contract=dslvm::ResultContract::from_schema(schema);
+      dslvm::Context context;context.set("ts",&host);
+      std::vector<size_t> order;for(size_t i=0;i<files.size();++i)order.push_back(i);
+      std::stable_sort(order.begin(),order.end(),[&](size_t a,size_t b){return priorities[a]<priorities[b];});
+      for(size_t position:order){const auto& part=results.registrations()[position];std::string phase="load";
+        try{auto program=dslvm::Program::load(read_bytecode(part.file),schema,reg);
+          results.select(part.index,reg,contract);phase="run";program.run(context,reg);
+          results.complete(part.index);
+          std::cout<<"{\"host_summary\":{\"part\":"<<part.index<<"}}\n";
+        }catch(const dslvm::Error& error){results.fail(part.index,phase,error);break;}
+        catch(const std::exception& error){results.fail(part.index,phase,dslvm::Error("RUN_HOST",error.what()));break;}
       }
-    }
-    const std::string schema(reinterpret_cast<const char *>(lmok::embedded_schema),
-                             lmok::embedded_schema_size);
-    dslvm::Context context;
-    context.set("ts", &host);
-    std::vector<dslvm::Program> programs;
-    for (int i = 2; i < argc; ++i) {
-      try {
-        programs.push_back(dslvm::Program::load(read_bytecode(argv[i]), schema, reg));
-      } catch (const dslvm::Error &error) {
-        return dslvm::report_error("load", error);
-      }
-    }
-    for (const auto &program : programs) {
-      host.reset(); // trees, nodes, lists and findings are per-file state (caps are per run)
-      invocation_result.reset(); // each program is its own invocation
-      try {
-        program.run(context, reg);
-      } catch (const dslvm::Error &error) {
-        return dslvm::report_error("run", error);
-      } catch (const std::exception &error) {
-        // Anything the host did not translate (regex engine limits,
-        // allocation failure) still ends with the standard result line
-        // instead of std::terminate.
-        return dslvm::report_error("run", dslvm::Error("RUN_HOST", error.what()));
-      }
-      dslvm::report_ok();
-      if (const int rc = emit_result()) return rc;
-    }
-    return 0;
+      return results.write_frame(std::cout);
+    }catch(const dslvm::Error& error){return dslvm::failure_frame("cli",error);}
   }
+
   std::cerr << usage;
   return 2;
 }

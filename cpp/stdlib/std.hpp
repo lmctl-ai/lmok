@@ -11,6 +11,7 @@
 #include "json.hpp"
 #include "encoding.hpp"
 #include "result.hpp"
+#include "invocation.hpp"
 #undef DSLVM_STD_BUILDING
 
 namespace dslvm {
@@ -54,6 +55,7 @@ inline stdlib::Collections& Registry::std_collections() const {
 }
 inline void Registry::set_result_sink(ResultSink* sink) {
   if (!has_std()) throw Error("std: registry has standard library disabled");
+  if(sink && sink->sealed()) throw Error("lmcode return: result sink is sealed");
   std_runtime_->result_sink = sink;
 }
 inline void Registry::set_std_output(std::ostream* sink) {

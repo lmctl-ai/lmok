@@ -15,12 +15,13 @@ commands=subprocess.check_output(['ninja','-C',str(BUILD),'-t','commands','lmok'
 link_cmd=shlex.split(commands[-1].removeprefix(': && ').removesuffix(' && :'))
 source=(ROOT/'cpp/main.cpp').read_text()
 mutations=[
- ('missing-frame', 'dslvm::write_result_frame(std::cout, invocation_result);', '(void)invocation_result;'),
- ('reset-per-entry', 'for (size_t entry : found->second) program.call(entry, context, reg, {handle});', 'for (size_t entry : found->second) { invocation_result.reset(); program.call(entry, context, reg, {handle}); }'),
- ('premature-frame', 'invocation_result.reset(); // each program is its own invocation', 'invocation_result.reset(); if (const int rc = emit_result()) return rc; // incorrect premature emission'),
- ('leaked-program', 'invocation_result.reset(); // each program is its own invocation', '// incorrect: prior program result leaks'),
- ('frame-before-sarif', 'if (sarif_path) {\n      // driver.rules:', 'if (const int rc = emit_result()) return rc;\n    if (sarif_path) {\n      // driver.rules:'),
+ ('missing-frame', '      return results.write_frame(std::cout);\n    }catch(const dslvm::Error& error)', '      return 0;\n    }catch(const dslvm::Error& error)'),
+ ('reset-per-entry', 'for (size_t entry : found->second) program.call(entry, context, reg, {handle});', 'for (size_t entry : found->second) { results.select(0,reg,dslvm::ResultContract::from_schema(schema)).reset(); program.call(entry, context, reg, {handle}); }'),
+ ('premature-frame', 'results.select(part.index,reg,contract);phase="run";program.run(context,reg);', 'results.select(part.index,reg,contract);results.write_frame(std::cout);phase="run";program.run(context,reg);'),
+ ('leaked-program', 'results.select(part.index,reg,contract)', 'results.select(0,reg,contract)'),
+ ('frame-before-sarif', 'if (sarif_path) {\n      // driver.rules:', 'results.complete(0);results.write_frame(std::cout);return 0;\n    if (sarif_path) {\n      // driver.rules:'),
 ]
+
 def verify(binary, caught):
     run=subprocess.run([sys.executable,str(ROOT/'tests/check-returns.py'),str(binary)],capture_output=True,text=True)
     if caught:
