@@ -64,6 +64,28 @@ struct Finding {
   std::optional<lmok::FixEdit> fix;
 };
 
+// Mtime in nanoseconds. MinGW libstdc++ resolves fs::last_write_time through
+// stat() and truncates to whole seconds, which makes same-second edits
+// invisible to the index stat fast path; Windows goes to the NTFS 100ns
+// stamp directly. The value is only ever compared host-to-host (stored vs
+// fresh read), so epoch consistency across platforms is not required.
+int64_t file_mtime_ns(const std::string &path, std::error_code &ec) {
+#ifdef _WIN32
+  WIN32_FILE_ATTRIBUTE_DATA data;
+  if (!GetFileAttributesExW(std::filesystem::u8path(path).wstring().c_str(), GetFileExInfoStandard, &data)) {
+    ec = std::error_code(static_cast<int>(GetLastError()), std::system_category());
+    return 0;
+  }
+  const uint64_t ticks = (static_cast<uint64_t>(data.ftLastWriteTime.dwHighDateTime) << 32) |
+                         data.ftLastWriteTime.dwLowDateTime;
+  return static_cast<int64_t>((ticks - 116444736000000000ULL) * 100); // 1601 -> 1970, 100ns -> ns
+#else
+  const auto ftime = std::filesystem::last_write_time(std::filesystem::u8path(path), ec);
+  if (ec) return 0;
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(ftime.time_since_epoch()).count();
+#endif
+}
+
 // Every arena is append-only for one program run and cleared by reset()
 // before the next --lmcode file (like the SDK's per-run reset of standard
 // collection handles), so handles never dangle and the caps are per run, not
@@ -811,12 +833,10 @@ static int run_cli(int argc, char **argv) {
         std::error_code ec;
         const auto fsize = fs::file_size(fs::u8path(path), ec);
         if (ec) { std::cerr << "cannot stat " << path << ": " << ec.message() << "\n"; return 3; }
-        const auto ftime = fs::last_write_time(fs::u8path(path), ec);
-        if (ec) { std::cerr << "cannot stat " << path << ": " << ec.message() << "\n"; return 3; }
         // Preserve subsecond edits; old whole-second DB stamps miss this fast
         // path once and are refreshed by the content-hash check below.
-        const int64_t mtime =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(ftime.time_since_epoch()).count();
+        const int64_t mtime = file_mtime_ns(path, ec);
+        if (ec) { std::cerr << "cannot stat " << path << ": " << ec.message() << "\n"; return 3; }
         const auto it = known.find(path);
         const bool reusable = !force && it != known.end() && it->second.extracted;
         if (reusable && it->second.mtime == mtime &&
