@@ -40,6 +40,9 @@ r=run_lmcode(rule,{{command:[{q(host)},"check","$DSLFILE",{q(target)},"--sarif",
 assert(r.ok&&r.result.body=="kept"&&r.result.last=="\\\"b\\\":2","check sink");
 r=run_lmcode(rule,{{command:[{q(host)},"check","$DSLFILE",{q(target)},"--sarif",{q(work)}]}});
 assert(!r.ok&&r.phase=="app"&&!r.has("result")&&!r.has("part"),"global SARIF failure");
+global_builder=lmcode_build([{q(host)},"check"]);global_builder.add(rule,["$DSLFILE"]);
+r=run_lmcode(global_builder,{{args:[{q(target)},"--sarif",{q(work)}]}});
+assert(!r.ok&&r.phase=="app"&&!r.has("part")&&!r.has("result")&&!r.has("parts"),"builder global SARIF failure");
 println("PASS real lmok invocation integration");
 '''
   file=work/'real.lms';file.write_text(source)
@@ -47,9 +50,9 @@ println("PASS real lmok invocation integration");
   assert p.returncode==0 and b'PASS real lmok invocation integration' in p.stdout,(p.returncode,p.stdout,p.stderr)
   for line in p.stdout.splitlines():
    if line.startswith(b'{"host_summary":'):assert set(json.loads(line))=={'host_summary'}
-  assert p.stdout.count(b'"host_summary":')==12,('lost summary',p.stdout)
+  assert p.stdout.count(b'"host_summary":')==13,('lost summary',p.stdout)
   groups=[json.loads(line) for line in p.stdout.splitlines() if line.startswith(b'[')]
-  assert [[x['rule'] for x in g] for g in groups]==[['R_FIRST','R_SECOND']*2]*2,groups
+  assert [[x['rule'] for x in g] for g in groups]==[['R_FIRST','R_SECOND']*2]*3,groups
   run=json.loads(sarif.read_text())['runs'][0]
   assert [r['ruleId'] for r in run['results']]==['R_FIRST','R_SECOND']*2,run
   assert [r['id'] for r in run['tool']['driver']['rules']]==['R_FIRST','R_SECOND'],run
