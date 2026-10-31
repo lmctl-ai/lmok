@@ -610,7 +610,7 @@ static int run_cli(int argc, char **argv) {
       "       lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
       "       lmok metrics [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
       "       lmok dup [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--tokens N] FILE|DIR...\n"
-      "       lmok --lmcode FILE [FILE ...]\n";
+      "       lmok --lmcode FILE [--lmcode FILE ...]\n";
   if (argc>=2 && std::string(argv[1])=="rules") {
     if(argc<3){std::cerr<<"rules needs PACK...\n";return 2;}
     try {

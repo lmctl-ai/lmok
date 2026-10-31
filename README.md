@@ -133,7 +133,7 @@ lmok rules PACK... | test PACK FIXTURE...
 lmok findings [--rule ID] [--file PATH] [--db PATH]
 lmok facts [--lang json|c|python|bash|java|go|javascript|typescript|tsx] FILE|DIR...
 lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]
-lmok --lmcode FILE [FILE ...]
+lmok --lmcode FILE [--lmcode FILE ...]
 ```
 
 `parse` prints the concrete syntax tree as a single-line s-expression, like
