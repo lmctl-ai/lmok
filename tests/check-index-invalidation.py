@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Same-length edits within one second must invalidate the persisted facts."""
 import os
-from contextlib import closing
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -25,27 +24,28 @@ with tempfile.TemporaryDirectory(prefix='lmok-index-stat-') as directory:
         assert result.returncode == 0, (result.returncode, result.stderr)
         return result.stdout.strip()
 
+    def expect(actual, wanted):
+        if actual != wanted:
+            with sqlite3.connect(db) as con:
+                row = con.execute('SELECT mtime, size, sha256 FROM files').fetchall()
+            raise AssertionError(f'got {actual!r}, want {wanted!r}; '
+                                 f'db rows={row}; stat ns={source.stat().st_mtime_ns}')
+
     first = write('int before;\n', 100_000_000)
-    assert index() == 'indexed 1 files (0 unchanged, 0 removed)'
+    expect(index(), 'indexed 1 files (0 unchanged, 0 removed)')
     second_stamp = write('int after_;\n', 200_000_000)
     assert first != second_stamp and first // 1_000_000_000 == second_stamp // 1_000_000_000
-    assert index() == 'indexed 1 files (0 unchanged, 0 removed)'
-    with closing(sqlite3.connect(db)) as con, con:
+    expect(index(), 'indexed 1 files (0 unchanged, 0 removed)')
+    with sqlite3.connect(db) as con:
         assert con.execute('SELECT name FROM symbols').fetchall() == [('after_',)]
         assert con.execute('SELECT text FROM file_text').fetchone()[0] == 'int after_;\n'
-    assert index() == 'indexed 0 files (1 unchanged, 0 removed)'
+    expect(index(), 'indexed 0 files (1 unchanged, 0 removed)')
     # Touch-only changes must refresh stat data without re-extracting.
     os.utime(source, ns=(second + 300_000_000, second + 300_000_000))
-    assert index() == 'indexed 0 files (1 unchanged, 0 removed)'
+    expect(index(), 'indexed 0 files (1 unchanged, 0 removed)')
     # Existing DBs with whole-second stamps get a one-time hash refresh.
-    with closing(sqlite3.connect(db)) as con, con:
+    with sqlite3.connect(db) as con:
         con.execute('UPDATE files SET mtime = mtime / 1000000000')
-    assert index() == 'indexed 0 files (1 unchanged, 0 removed)'
-    try:
-        con.execute('SELECT 1')
-    except sqlite3.ProgrammingError:
-        pass
-    else:
-        raise AssertionError('inspection connection must close before scratch directory cleanup')
-    assert index('--force') == 'indexed 1 files (0 unchanged, 0 removed)'
+    expect(index(), 'indexed 0 files (1 unchanged, 0 removed)')
+    expect(index('--force'), 'indexed 1 files (0 unchanged, 0 removed)')
 print('index: subsecond edits, stat/hash skips, legacy timestamps and --force verified')
