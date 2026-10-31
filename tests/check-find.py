@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Search oracles use only temporary files/DBs; native output is compared as bytes."""
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import os
+from contextlib import closing
 import sqlite3
 import subprocess
 import sys
@@ -88,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix='lmok-find-') as temp:
         p = find('fo', '--lang', 'python')
         assert p.stdout == b'src/b.py:0:2: # foo( end\nsrc/b.py:1:7: # FOOD foo\n'
         # Legacy schema-2 databases stay readable, then index upgrades only FTS.
-        with sqlite3.connect(root / 'index.db') as db:
+        with closing(sqlite3.connect(root / 'index.db')) as db, db:
             rows = db.execute('SELECT rowid,path,lang,text FROM file_text').fetchall()
             symbols = db.execute('SELECT * FROM symbols').fetchall()
             db.execute('DROP TABLE file_text')
@@ -97,10 +98,10 @@ with tempfile.TemporaryDirectory(prefix='lmok-find-') as temp:
         p = find('foo(')
         assert p.stdout == expected and b'legacy text index' in p.stderr
         assert find('foo', '--fts', '--lang', 'python').stdout == b'src/b.py:0:2: # foo( end\nsrc/b.py:1:7: # FOOD foo\n'
-        with sqlite3.connect(root / 'index.db') as db:
+        with closing(sqlite3.connect(root / 'index.db')) as db, db:
             assert 'trigram' not in db.execute("SELECT sql FROM sqlite_master WHERE name='file_text'").fetchone()[0]
         assert run('index', 'src', '--db', 'index.db').stdout == b'indexed 0 files (3 unchanged, 0 removed)\n'
-        with sqlite3.connect(root / 'index.db') as db:
+        with closing(sqlite3.connect(root / 'index.db')) as db, db:
             assert "tokenize='trigram'" in db.execute("SELECT sql FROM sqlite_master WHERE name='file_text'").fetchone()[0]
             assert db.execute('SELECT * FROM symbols').fetchall() == symbols
             assert db.execute('SELECT rowid,path,lang,text FROM file_text').fetchall() == rows
@@ -109,14 +110,22 @@ with tempfile.TemporaryDirectory(prefix='lmok-find-') as temp:
         run('index', 'src', '--db', 'index.db')
         assert find('foo(').stdout.endswith(b'src/bytes.c:0:5: // \xff foo(\x00 foo(\nsrc/bytes.c:0:11: // \xff foo(\x00 foo(\n')
         # A unique needle after NUL must survive FTS tokenizer truncation.
-        (root / 'src/nul.c').write_bytes(b'// prefix\x00 only_after_nul\n')
+        # NUL.c is a Windows device, so use an ordinary filename for these bytes.
+        assert not PureWindowsPath('embedded-nul.c').is_reserved(), 'fixture must be a real file on Windows'
+        (root / 'src/embedded-nul.c').write_bytes(b'// prefix\x00 only_after_nul\n')
         run('index', 'src', '--db', 'index.db')
         p = find('only_after_nul')
-        assert p.stdout == b'src/nul.c:0:11: // prefix\x00 only_after_nul\n' and b'scanning stored byte-text' in p.stderr
+        assert p.stdout == b'src/embedded-nul.c:0:11: // prefix\x00 only_after_nul\n' and b'scanning stored byte-text' in p.stderr, (p.stdout,p.stderr)
         # NULL safety metadata (e.g. imported rows) is conservatively scanned.
-        with sqlite3.connect(root / 'index.db') as db:
-            db.execute("UPDATE file_text SET byte_scan=NULL WHERE path='src/nul.c'")
+        with closing(sqlite3.connect(root / 'index.db')) as db, db:
+            db.execute("UPDATE file_text SET byte_scan=NULL WHERE path='src/embedded-nul.c'")
         assert find('only_after_nul').stdout == p.stdout
+        try:
+            db.execute('SELECT 1')
+        except sqlite3.ProgrammingError:
+            pass
+        else:
+            raise AssertionError('fallback inspection connection must close before scratch cleanup')
         if os.name != 'nt':
             p = find(os.fsdecode(b'\xff f'))
             assert b'src/bytes.c:0:3:' in p.stdout and b'scanning stored text' in p.stderr
