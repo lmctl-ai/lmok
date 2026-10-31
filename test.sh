@@ -1196,6 +1196,9 @@ out="$(cd "$DBFIX" && "$HOST_ABS" index --force --db "$WORK/test.db" .)"
 [ "$out" = "indexed 4 files (0 unchanged, 0 removed)" ] || fail "index --force: $out"
 ok "index: stat/hash invalidation, per-file re-extract, vanished removal, --force"
 
+python3 tests/check-index-invalidation.py "$HOST" || fail "index subsecond invalidation"
+ok "index: same-size subsecond edits refresh facts; touch/hash/legacy stat skips"
+
 python3 - "$WORK/test.db" <<'PY'
 import sqlite3, sys
 con = sqlite3.connect(sys.argv[1])

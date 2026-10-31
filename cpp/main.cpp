@@ -761,8 +761,10 @@ static int run_cli(int argc, char **argv) {
         if (ec) { std::cerr << "cannot stat " << path << ": " << ec.message() << "\n"; return 3; }
         const auto ftime = fs::last_write_time(fs::u8path(path), ec);
         if (ec) { std::cerr << "cannot stat " << path << ": " << ec.message() << "\n"; return 3; }
+        // Preserve subsecond edits; old whole-second DB stamps miss this fast
+        // path once and are refreshed by the content-hash check below.
         const int64_t mtime =
-            std::chrono::duration_cast<std::chrono::seconds>(ftime.time_since_epoch()).count();
+            std::chrono::duration_cast<std::chrono::nanoseconds>(ftime.time_since_epoch()).count();
         const auto it = known.find(path);
         const bool reusable = !force && it != known.end() && it->second.extracted;
         if (reusable && it->second.mtime == mtime &&
@@ -1354,7 +1356,7 @@ static int run_cli(int argc, char **argv) {
         std::error_code mtime_ec;
         const auto written = fs::last_write_time(fs::u8path(target.path), mtime_ec);
         if (!mtime_ec)
-          record.mtime = std::chrono::duration_cast<std::chrono::seconds>(written.time_since_epoch()).count();
+          record.mtime = std::chrono::duration_cast<std::chrono::nanoseconds>(written.time_since_epoch()).count();
         record.findings = std::move(findings);
         records.push_back(std::move(record));
       }
