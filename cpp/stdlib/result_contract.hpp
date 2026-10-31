@@ -72,14 +72,14 @@ public:
   // Preserve known collection distinctions even when an empty value has no
   // elements to inspect. Json handles deliberately defer to their actual shape.
   static std::string source_type(const Value& value){
-    switch(value.kind){case Value::INT:return "int";case Value::FLOAT:return "float";case Value::BOOL:return "bool";case Value::STR:return "string";case Value::VOID:return "null";case Value::OBJ:return value.type;}
+    switch(value.kind){case Value::INT:return "int";case Value::FLOAT:return "float";case Value::BOOL:return "bool";case Value::STR:return "string";case Value::VOID:return "null";case Value::DRY_NULL:return value.is_dry_null()?"null":"dry null";case Value::OBJ:return value.type;}
     return "handle";
   }
   static bool assignable(const std::string& actual,const std::string& expected){
     return actual==expected||(actual=="int"&&expected=="float")||(actual=="IntList"&&expected=="FloatList")||(actual=="IntMap"&&expected=="FloatMap");
   }
   void validate_source(const Value& v)const{
-    if(type_.empty()||type_=="Json"||v.kind==Value::VOID||(v.kind==Value::OBJ&&v.type=="Json"))return;
+    if(type_.empty()||type_=="Json"||v.kind==Value::VOID||v.is_dry_null()||(v.kind==Value::OBJ&&v.type=="Json"))return;
     const auto actual=source_type(v);
     if(!assignable(actual,type_))invocation_detail::mismatch("",type_,actual);
   }

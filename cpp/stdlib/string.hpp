@@ -224,22 +224,22 @@ inline bool str_match(const std::string& text, const std::string& pattern) {
 
 inline Registry& register_string(Registry& r) {
   if (r.has_std()) return r;
-  r.function("str_starts_with", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_starts_with(a[0].s, a[1].s)); });
-  r.function("str_ends_with", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_ends_with(a[0].s, a[1].s)); });
-  r.function("str_contains", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_contains(a[0].s, a[1].s)); });
-  r.function("str_lower", {"string"}, "string", [](Args& a) { return Value::string(str_lower(a[0].s)); });
-  r.function("str_upper", {"string"}, "string", [](Args& a) { return Value::string(str_upper(a[0].s)); });
-  r.function("str_substr", {"string", "int", "int"}, "string", [](Args& a) { return Value::string(str_substr(a[0].s, a[1].i, a[2].i)); });
-  r.function("str_len", {"string"}, "int", [](Args& a) { return Value::integer(str_len(a[0].s)); });
-  r.function("str_match", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_match(a[0].s, a[1].s)); });
-  r.function("str_find", {"string", "string"}, "int", [](Args& a) { return Value::integer(str_find(a[0].s, a[1].s)); });
-  r.function("str_replace", {"string", "string", "string"}, "string", [](Args& a) { return Value::string(str_replace(a[0].s, a[1].s, a[2].s)); });
-  r.function("str_trim", {"string"}, "string", [](Args& a) { return Value::string(str_trim(a[0].s)); });
-  r.function("str_repeat", {"string", "int"}, "string", [](Args& a) { return Value::string(str_repeat(a[0].s, a[1].i)); });
-  r.function("str_to_int", {"string"}, "int", [](Args& a) { return Value::integer(str_to_int(a[0].s)); });
-  r.function("str_is_int", {"string"}, "bool", [](Args& a) { return Value::boolean(str_is_int(a[0].s)); });
-  r.function("str_to_float", {"string"}, "float", [](Args& a) { return Value::real(str_to_float(a[0].s)); });
-  r.function("str_is_float", {"string"}, "bool", [](Args& a) { return Value::boolean(str_is_float(a[0].s)); });
+  pure_std_function(r, "str_starts_with", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_starts_with(a[0].s, a[1].s)); });
+  pure_std_function(r, "str_ends_with", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_ends_with(a[0].s, a[1].s)); });
+  pure_std_function(r, "str_contains", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_contains(a[0].s, a[1].s)); });
+  pure_std_function(r, "str_lower", {"string"}, "string", [](Args& a) { return Value::string(str_lower(a[0].s)); });
+  pure_std_function(r, "str_upper", {"string"}, "string", [](Args& a) { return Value::string(str_upper(a[0].s)); });
+  pure_std_function(r, "str_substr", {"string", "int", "int"}, "string", [](Args& a) { return Value::string(str_substr(a[0].s, a[1].i, a[2].i)); });
+  pure_std_function(r, "str_len", {"string"}, "int", [](Args& a) { return Value::integer(str_len(a[0].s)); });
+  pure_std_function(r, "str_match", {"string", "string"}, "bool", [](Args& a) { return Value::boolean(str_match(a[0].s, a[1].s)); });
+  pure_std_function(r, "str_find", {"string", "string"}, "int", [](Args& a) { return Value::integer(str_find(a[0].s, a[1].s)); });
+  pure_std_function(r, "str_replace", {"string", "string", "string"}, "string", [](Args& a) { return Value::string(str_replace(a[0].s, a[1].s, a[2].s)); });
+  pure_std_function(r, "str_trim", {"string"}, "string", [](Args& a) { return Value::string(str_trim(a[0].s)); });
+  pure_std_function(r, "str_repeat", {"string", "int"}, "string", [](Args& a) { return Value::string(str_repeat(a[0].s, a[1].i)); });
+  pure_std_function(r, "str_to_int", {"string"}, "int", [](Args& a) { return Value::integer(str_to_int(a[0].s)); });
+  pure_std_function(r, "str_is_int", {"string"}, "bool", [](Args& a) { return Value::boolean(str_is_int(a[0].s)); });
+  pure_std_function(r, "str_to_float", {"string"}, "float", [](Args& a) { return Value::real(str_to_float(a[0].s)); });
+  pure_std_function(r, "str_is_float", {"string"}, "bool", [](Args& a) { return Value::boolean(str_is_float(a[0].s)); });
   return r;
 }
 

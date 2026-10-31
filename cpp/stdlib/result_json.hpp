@@ -144,6 +144,7 @@ inline JsonNode copy_value(const Value& v, const std::string& path="") {
     case Value::BOOL: n.kind=JsonNode::Kind::Bool;n.boolean=v.b;return n;
     case Value::STR: valid_utf8(v.s,path);n.kind=JsonNode::Kind::String;n.text=v.s;return n;
     case Value::VOID: n.kind=JsonNode::Kind::Null;return n;
+    case Value::DRY_NULL: if(!v.is_dry_null())invalid(path,"dry null");n.kind=JsonNode::Kind::Null;return n;
     case Value::OBJ: break;
   }
   if(!v.obj) invalid(path,"handle");

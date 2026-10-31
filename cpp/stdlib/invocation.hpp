@@ -22,13 +22,14 @@ inline int exit_code(const std::string& phase){
   if(phase=="app")return 4;
   throw Error("lmcode invocation: invalid failure phase");
 }
-inline std::string failure(const std::string& phase,const Error& e,std::optional<size_t> part={}){
+inline std::string failure(const std::string& phase,const Error& e,std::optional<size_t> part={},bool dry=false){
   (void)exit_code(phase);
   stdlib::result_detail::valid_utf8(e.code,"");stdlib::result_detail::valid_utf8(e.message,"");
   std::string out="{\"ok\":false,\"phase\":"+json_escape(phase)+",\"code\":"+json_escape(e.code)+",\"message\":"+json_escape(e.message);
   if(e.has_column&&(!e.has_location||!e.line||!e.column))throw Error("lmcode invocation: column requires a positive line");
   if(e.has_location){if(!e.line)throw Error("lmcode invocation: line must be positive");out+=",\"line\":"+std::to_string(e.line);if(e.has_column)out+=",\"column\":"+std::to_string(e.column);}
   if(part)out+=",\"part\":"+std::to_string(*part);
+  if(dry)out+=",\"dry\":true";
   return out+"}";
 }
 inline void output_error()noexcept{try{std::cerr<<"lmcode invocation: cannot write envelope\n";}catch(...){}}
@@ -44,19 +45,19 @@ inline void keys(const Node& n,std::initializer_list<const char*> allowed){
 }
 }
 // Errors before collector construction have no submitted slot association.
-inline int failure_frame(std::ostream& out,const std::string& phase,const Error& error){return invocation_detail::emit(out,invocation_detail::failure(phase,error),invocation_detail::exit_code(phase));}
+inline int failure_frame(std::ostream& out,const std::string& phase,const Error& error){return invocation_detail::emit(out,invocation_detail::failure(phase,error,{},error.has_invocation_dry&&error.invocation_dry),invocation_detail::exit_code(phase));}
 inline int failure_frame(const std::string& phase,const Error& error){return failure_frame(std::cout,phase,error);}
 
 struct InvocationRegistration {std::string file;size_t index;};
 class InvocationResults {
   struct Slot {std::unique_ptr<ResultSink> sink;std::optional<stdlib::JsonNode> result;};
   struct Failure {std::string phase;Error error;std::optional<size_t> part;};
-  bool builder_=false,writing_=false;
+  bool builder_=false,dry_=false,writing_=false;
   std::vector<InvocationRegistration> registrations_;
   std::vector<Slot> slots_;
   std::optional<Failure> failure_;
   Slot& slot(size_t index){if(index>=slots_.size())throw Error("lmcode invocation: invalid slot index");return slots_[index];}
-  InvocationResults(bool builder,std::vector<InvocationRegistration> registrations,size_t count):builder_(builder),registrations_(std::move(registrations)),slots_(count){}
+  InvocationResults(bool builder,bool dry,std::vector<InvocationRegistration> registrations,size_t count):builder_(builder),dry_(dry),registrations_(std::move(registrations)),slots_(count){}
 public:
   InvocationResults(InvocationResults&&)=default;
   InvocationResults& operator=(InvocationResults&&)=default;
@@ -64,11 +65,14 @@ public:
   InvocationResults& operator=(const InvocationResults&)=delete;
   static InvocationResults from_metadata(const std::string& raw,const std::vector<std::string>& parsed_files){
     using namespace invocation_detail;
+    bool mode_known=false,dry_mode=false;
     try{
-      auto root=parse(raw);keys(root,{"version","mode","parts"});
-      const auto*version=member(root,"version"),*mode=member(root,"mode"),*parts=member(root,"parts");
+      auto root=parse(raw);keys(root,{"version","mode","dry","parts"});
+      const auto*version=member(root,"version"),*mode=member(root,"mode"),*dry=member(root,"dry"),*parts=member(root,"parts");
       if(!version||!integer(*version)||integer_value(*version)!=1)metadata_error("unsupported version");
       if(!mode||mode->kind!=Kind::String||(mode->text!="single"&&mode->text!="builder"))metadata_error("invalid mode");
+      if(!dry||dry->kind!=Kind::Bool)metadata_error("dry must be boolean");
+      mode_known=true;dry_mode=dry->boolean;
       if(!parts||parts->kind!=Kind::Array||parts->array.empty()||(mode->text=="single"&&parts->array.size()!=1))metadata_error("invalid parts");
       std::vector<std::string> files;
       for(size_t i=0;i<parts->array.size();++i){
@@ -85,8 +89,13 @@ public:
         if(found==files.end())metadata_error("extra registration");
         const auto index=static_cast<size_t>(found-files.begin());if(seen[index])metadata_error("duplicate registration");seen[index]=true;registrations.push_back({file,index});
       }
-      return InvocationResults(mode->text=="builder",std::move(registrations),files.size());
-    }catch(const Error&e){if(e.code=="CLI_USAGE")throw;metadata_error(e.message);}
+      return InvocationResults(mode->text=="builder",dry->boolean,std::move(registrations),files.size());
+    }catch(const Error& error){
+      Error e=error;
+      if(mode_known){e.has_invocation_dry=true;e.invocation_dry=dry_mode;throw e;}
+      if(e.code=="CLI_USAGE")throw;
+      metadata_error(e.message);
+    }
   }
   static InvocationResults from_command(const std::vector<std::string>& parsed_files,const std::optional<std::string>& manifest){
     if(manifest){
@@ -99,7 +108,10 @@ public:
     if(parsed_files.empty())invocation_detail::metadata_error("empty parts");
     std::vector<InvocationRegistration> registrations;
     for(size_t i=0;i<parsed_files.size();++i){if(parsed_files[i].empty()||parsed_files[i].find('\0')!=std::string::npos)invocation_detail::metadata_error("invalid command file");try{stdlib::result_detail::valid_utf8(parsed_files[i],"");}catch(const Error&){invocation_detail::metadata_error("file must be UTF-8");}registrations.push_back({parsed_files[i],i});}
-    return InvocationResults(parsed_files.size()>1,std::move(registrations),parsed_files.size());
+    return InvocationResults(parsed_files.size()>1,false,std::move(registrations),parsed_files.size());
+  }
+  static InvocationResults from_command(const std::vector<std::string>& parsed_files,bool embedded_dry){
+    auto result=from_command(parsed_files,std::nullopt);result.dry_=embedded_dry;return result;
   }
   static InvocationResults from_command(const std::vector<std::string>& parsed_files){
 #ifdef _WIN32
@@ -114,6 +126,7 @@ public:
 #endif
   }
   const std::vector<InvocationRegistration>& registrations()const{return registrations_;}
+  bool dry()const{return dry_;}
   ResultSink& select(size_t index,Registry& registry,const ResultContract& contract){
     if(writing_)throw Error("lmcode invocation: finalized");
     auto& s=slot(index);
@@ -136,12 +149,13 @@ public:
     try{
     if(!failure_)for(size_t i=0;i<slots_.size();++i)if(!slots_[i].result){fail(i,"run",Error("lmcode invocation: slot not completed"));break;}
     std::string payload;int code=0;
-    if(failure_){payload=invocation_detail::failure(failure_->phase,failure_->error,failure_->part);code=invocation_detail::exit_code(failure_->phase);}
+    if(failure_){payload=invocation_detail::failure(failure_->phase,failure_->error,failure_->part,dry_);code=invocation_detail::exit_code(failure_->phase);}
     else{
       payload="{\"ok\":true,\"result\":";
       if(builder_){payload+='[';for(size_t i=0;i<slots_.size();++i){if(i)payload+=',';payload+=stdlib::result_detail::encode(*slots_[i].result);}payload+=']';payload+=",\"parts\":"+std::to_string(slots_.size());}
       else payload+=stdlib::result_detail::encode(*slots_[0].result);
       payload+='}';
+      if(dry_) payload.insert(payload.size()-1,",\"dry\":true");
     }
     writing_=true;return invocation_detail::emit(out,payload,code);
     }catch(...){writing_=true;invocation_detail::output_error();return 4;}

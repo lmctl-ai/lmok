@@ -56,20 +56,20 @@ public:
 namespace stdlib {
 inline Registry& register_results(Registry& registry,ResultSink*& configured) {
   for(const char* type:{"int","float","bool","string","Json","StrList","IntList","FloatList","StrMap","IntMap","FloatMap"}) {
-    registry.function("lmcode_return_set",{type},"void",[&configured](Args& args){
+    pure_std_function(registry, "lmcode_return_set",{type},"void",[&configured](Args& args){
       if(!configured) throw Error("lmcode return: no result sink");
       configured->set(args[0]);return Value::none();
     });
-    registry.function("lmcode_return_put",{"string",type},"void",[&configured](Args& args){
+    pure_std_function(registry, "lmcode_return_put",{"string",type},"void",[&configured](Args& args){
       if(!configured) throw Error("lmcode return: no result sink");
       configured->put(args[0].s,args[1]);return Value::none();
     });
   }
-  registry.function("lmcode_return_null",{},"void",[&configured](Args&){
+  pure_std_function(registry, "lmcode_return_null",{},"void",[&configured](Args&){
     if(!configured) throw Error("lmcode return: no result sink");
     configured->set_null();return Value::none();
   });
-  registry.function("lmcode_return_put_null",{"string"},"void",[&configured](Args& args){
+  pure_std_function(registry, "lmcode_return_put_null",{"string"},"void",[&configured](Args& args){
     if(!configured) throw Error("lmcode return: no result sink");
     configured->put_null(args[0].s);return Value::none();
   });
