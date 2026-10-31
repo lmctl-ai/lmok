@@ -1256,4 +1256,14 @@ ok "review baseline snapshots and Git filenames"
 python3 tests/check-review-sarif.py "$HOST" || fail "review SARIF Unicode and URIs"
 ok "review SARIF Unicode and URIs"
 
+# --- E9 live repo map and optional DB ranking ---
+python3 tests/check-outline.py "$HOST" live || fail "outline live facts"
+ok "outline live signatures, scopes, path order and duplicate inputs"
+python3 tests/check-outline.py "$HOST" db || fail "outline DB ranking"
+ok "outline explicit/default DB ranking and live definition authority"
+python3 tests/check-outline.py "$HOST" budget || fail "outline budget"
+ok "outline whole-file line budgets and exact truncation counts"
+python3 tests/check-outline.py "$HOST" errors || fail "outline errors"
+ok "outline invalid options, missing input and corrupt DB errors"
+
 echo "PASS: $pass checks"

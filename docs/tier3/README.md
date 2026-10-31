@@ -96,3 +96,7 @@ watch mode/daemon/server, schema migrations in 0.x (delete + re-index).
    roughly the first week of that.)
 The binary/product rename to `lmok` is complete; release assets, `test.sh`
 and CI artifact names use `lmok`.
+
+**E9 landed:** [`lmok outline`](outline.md) uses live facts for definitions
+and an optional read-only DB for reference-name ranking, with a whole-block
+line budget. No daemon or DB is required.

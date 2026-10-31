@@ -764,3 +764,10 @@ See [the grammar contract and S5 seam](durable-memory/15-script-languages.md).
 ## Historical literal names
 
 The documentation calls the language lmcode. `--lmcode`, `--lmcode-schema` and `--lmcode-signatures` are current host flag literals; `DSLB` is the bytecode magic and `DSLB v6` is the current format name; `.dslb` is the current bytecode filename extension; `_lmcode_` is the historical block spelling. Other code-formatted API names, paths, manifest names and diagnostic text retain their current literal spellings.
+
+## Outline
+
+`lmok outline FILE|DIR... [--db PATH] [--budget N]` prints live definitions,
+first-line signatures and scopes grouped by file. An available DB ranks
+files by reference-name occurrence counts; otherwise paths determine order.
+The line budget keeps whole file blocks. See [the output contract](docs/tier3/outline.md).

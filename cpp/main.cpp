@@ -23,6 +23,8 @@
 #include "notices_embedded.hpp"
 
 #include <cstdio>
+#include <charconv>
+#include <limits>
 #include <chrono>
 #include <ctime>
 #include <deque>
@@ -606,6 +608,7 @@ static int run_cli(int argc, char **argv) {
       "       lmok rules PACK... | test PACK FIXTURE...\n"
       "       lmok lint RULES.json FILE|DIR... [--db PATH] [--no-suppress] [--sarif FILE] [--fix|--diff]\n"
       "               [--new-since RUN|--baseline FILE] [--fail-on-new] [--changed[=REV]]\n"
+      "       lmok outline FILE|DIR... [--db PATH] [--budget N]\n"
       "       lmok facts [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
       "       lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
       "       lmok metrics [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
@@ -1412,6 +1415,101 @@ static int run_cli(int argc, char **argv) {
       } catch (const std::exception &error) {
         std::cerr << argv[1] << " " << target.path << ": " << error.what() << "\n"; return 3;
       }
+    }
+    return std::cout ? 0 : 4;
+  }
+  // Definitions always come from live facts. The optional DB is ranking only.
+  if (argc >= 2 && std::string(argv[1]) == "outline") {
+    std::optional<std::string> dbpath;
+    size_t budget = std::numeric_limits<size_t>::max();
+    std::vector<std::string> paths;
+    bool positional = false;
+    for (int i = 2; i < argc; ++i) {
+      const std::string arg = argv[i];
+      if (!positional && arg == "--") { positional = true; continue; }
+      if (!positional && (arg == "--db" || arg == "--budget")) {
+        if (++i == argc) { std::cerr << arg << " needs a value\n"; return 2; }
+        if (arg == "--db") dbpath = argv[i];
+        else {
+          const std::string value = argv[i];
+          const auto parsed = std::from_chars(value.data(), value.data() + value.size(), budget);
+          if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || budget == 0) {
+            std::cerr << "--budget needs a positive integer\n"; return 2;
+          }
+        }
+      } else if (!positional && arg.rfind("--", 0) == 0) {
+        std::cerr << "unknown outline option: " << arg << "\n"; return 2;
+      } else paths.push_back(arg);
+    }
+    if (paths.empty()) { std::cerr << usage; return 2; }
+    std::vector<Target> targets;
+    if (const int rc = expand_targets(paths, 0, targets)) return rc;
+    struct Block { std::string path; int64_t refs = 0; std::vector<std::string> lines; };
+    std::vector<Block> blocks;
+    std::string current;
+    try {
+      const auto resolved = lmok::resolve_db_path(dbpath, false);
+      const bool ranked = dbpath.has_value() || std::filesystem::exists(resolved);
+      std::map<std::string, int64_t> counts;
+      if (ranked) {
+        lmok::Database db(resolved);
+        auto query = db.prepare("SELECT name, count(*) FROM refs GROUP BY name");
+        while (query.step()) counts.emplace(query.text(0), query.integer(1));
+      }
+      std::set<std::string> seen;
+      for (const auto &target : targets) {
+        current = target.path;
+        const auto path = std::filesystem::u8path(current).lexically_normal().generic_u8string();
+        if (!seen.insert(path).second) continue;
+        lmok::Grammar grammar;
+        if (!grammar_for_extension(std::filesystem::u8path(path).extension().u8string(), grammar)) {
+          std::cerr << "cannot infer the language of " << current << " from its extension\n"; return 2;
+        }
+        const auto raw = read_file(current);
+        const auto tree = lmok::parse(grammar, raw);
+        Block block{path, 0, {}};
+        std::set<std::string> names;
+        for (const auto &fact : lmok::extract_facts(tree, grammar)) {
+          if (fact.kind.rfind("def.", 0) != 0) continue;
+          names.insert(fact.name);
+          const size_t begin = static_cast<size_t>(fact.start_byte);
+          const size_t end = std::min(static_cast<size_t>(fact.end_byte), raw.find_first_of("\r\n", begin));
+          std::string signature = raw.substr(begin, end - begin);
+          while (!signature.empty() && (signature.back() == ' ' || signature.back() == '\t')) signature.pop_back();
+          std::string line = "  " + json_escape(fact.name) + "  " + fact.kind.substr(4) + "  " +
+              std::to_string(fact.row) + ":" + std::to_string(fact.col);
+          if (!fact.scope.empty()) line += "  scope: " + json_escape(fact.scope);
+          line += "  signature: " + json_escape(signature);
+          block.lines.push_back(std::move(line));
+        }
+        if (block.lines.empty()) continue;
+        for (const auto &name : names) {
+          const auto found = counts.find(name);
+          if (found != counts.end()) block.refs += found->second;
+        }
+        block.lines.insert(block.lines.begin(), json_escape(path) +
+            (ranked ? " (refs: " + std::to_string(block.refs) + ")" : ""));
+        blocks.push_back(std::move(block));
+      }
+      std::sort(blocks.begin(), blocks.end(), [](const Block &a, const Block &b) {
+        return a.refs != b.refs ? a.refs > b.refs : a.path < b.path;
+      });
+      size_t total = 0;
+      for (const auto &block : blocks) total += block.lines.size();
+      const bool truncated = total > budget;
+      size_t remaining = truncated ? budget - 1 : budget;
+      size_t printed = 0;
+      for (const auto &block : blocks) {
+        if (block.lines.size() > remaining) break;
+        for (const auto &line : block.lines) std::cout << line << '\n';
+        remaining -= block.lines.size();
+        ++printed;
+      }
+      if (truncated) std::cout << "... (" << blocks.size() - printed << " more files)\n";
+    } catch (const lmok::DbError &error) {
+      std::cerr << "outline: " << error.what() << "\n"; return error.exit_code;
+    } catch (const std::exception &error) {
+      std::cerr << "outline " << current << ": " << error.what() << "\n"; return 3;
     }
     return std::cout ? 0 : 4;
   }
