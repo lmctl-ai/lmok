@@ -30,9 +30,14 @@ if [ ! -x "$dest/lmscript/bin/lmscript" ]; then
   (cd "$tmp/mono" && npm ci --ignore-scripts --no-audit --no-fund >&2 && npm run build >&2)
   [ -x "$tmp/mono/lmscript/bin/lmscript" ] || { echo "error: mono build produced no lmscript binary" >&2; exit 2; }
   mkdir -p "$cache"
-  rm -rf "$dest.partial.$$"
+  rm -rf "${dest:?}.partial.$$"
   mv "$tmp/mono" "$dest.partial.$$"
-  mv "$dest.partial.$$" "$dest" 2>/dev/null || rm -rf "$dest.partial.$$"   # lost a race; winner's copy is fine
+  # A stale/incomplete $dest (interrupted earlier build) must be replaced, not
+  # descended into: `mv a b` with an existing directory b moves a INSIDE b and
+  # the published path stays broken. A complete $dest is another clone's win.
+  [ -x "$dest/lmscript/bin/lmscript" ] || rm -rf "${dest:?}"
+  mv "$dest.partial.$$" "$dest" 2>/dev/null || rm -rf "${dest:?}.partial.$$"   # lost a race; winner's copy is fine
+  [ -x "$dest/lmscript/bin/lmscript" ] || { echo "error: compiler publish failed: $dest has no lmscript binary" >&2; exit 2; }
   rm -rf "$tmp"; trap - EXIT
 fi
 [ -x "$dest/lmscript/bin/lmscript" ] || { echo "error: compiler cache at $dest is incomplete; remove it and retry" >&2; exit 2; }

@@ -732,11 +732,18 @@ static int run_cli(int argc, char **argv) {
     try {
       const auto resolved = lmok::resolve_db_path(db_path, true);
       lmok::Database db(resolved, lmok::Database::Mode::Create);
-      struct FileRow { int64_t id; std::string sha256; int64_t mtime; int64_t size; };
+      // `extracted` distinguishes a row written by `index` (facts + file_text
+      // present) from one `lint --db` created only so findings have a file_id:
+      // the latter has the real hash/stat but NO extraction, so "unchanged"
+      // must never skip it (review finding: lint --db then index left files
+      // silently un-indexed with "N unchanged").
+      struct FileRow { int64_t id; std::string sha256; int64_t mtime; int64_t size; bool extracted; };
       std::map<std::string, FileRow> known;
       {
-        auto q = db.prepare("SELECT id, path, sha256, mtime, size FROM files");
-        while (q.step()) known.emplace(q.text(1), FileRow{q.integer(0), q.text(2), q.integer(3), q.integer(4)});
+        auto q = db.prepare("SELECT f.id, f.path, f.sha256, f.mtime, f.size,"
+                            " EXISTS(SELECT 1 FROM file_text t WHERE t.path = f.path) FROM files f");
+        while (q.step())
+          known.emplace(q.text(1), FileRow{q.integer(0), q.text(2), q.integer(3), q.integer(4), q.integer(5) != 0});
       }
       const int64_t now = static_cast<int64_t>(std::time(nullptr));
       int64_t n_indexed = 0, n_unchanged = 0;
@@ -757,13 +764,14 @@ static int run_cli(int argc, char **argv) {
         const int64_t mtime =
             std::chrono::duration_cast<std::chrono::seconds>(ftime.time_since_epoch()).count();
         const auto it = known.find(path);
-        if (!force && it != known.end() && it->second.mtime == mtime &&
+        const bool reusable = !force && it != known.end() && it->second.extracted;
+        if (reusable && it->second.mtime == mtime &&
             it->second.size == static_cast<int64_t>(fsize)) { ++n_unchanged; continue; }
         std::string raw;
         try { raw = read_file(path); }
         catch (const dslvm::Error &e) { std::cerr << e.what() << "\n"; return 3; }
         const std::string hash = dslvm::hex(dslvm::sha256(raw));
-        if (!force && it != known.end() && it->second.sha256 == hash) {
+        if (reusable && it->second.sha256 == hash) {
           // Stat changed but content did not: refresh the stat fields only.
           auto upd = db.prepare("UPDATE files SET mtime=?, size=?, indexed_at=? WHERE id=?");
           upd.bind(1, mtime); upd.bind(2, static_cast<int64_t>(fsize)); upd.bind(3, now);

@@ -22,6 +22,7 @@ Repository: https://github.com/lmctl-ai/lmok.
 | [11-pattern-rules.md](11-pattern-rules.md) | Code-shaped (semgrep-style) patterns compiled to queries: `query --pattern`, pack `pattern` fields, `ts.match_*`, corner cases |
 | [12-autofix.md](12-autofix.md) | Whole-node fix metadata, verified edits and unified previews |
 | [13-baseline-sarif.md](13-baseline-sarif.md) | lint --new-since/--baseline/--changed/--fail-on-new keying, findings.snippet column, host --sarif on lint/check/ci |
+| [16-review-mainline-wave.md](16-review-mainline-wave.md) | Independent review of the bef3003..065a833 wave: index-after-lint fix, --changed hardening, bootstrap publish, import bindings, L notes |
 
 Operational name: **lmok** (binary, schemas, CMake and install paths). Tier-3
 proposal documents are owned by the other team and were intentionally retained

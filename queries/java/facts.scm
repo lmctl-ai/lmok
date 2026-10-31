@@ -7,7 +7,9 @@
 (constructor_declaration name: (identifier) @name) @def.method
 (field_declaration declarator: (variable_declarator name: (identifier) @name) @def.field)
 (formal_parameter name: (identifier) @name) @def.parameter
-(import_declaration (scoped_identifier name: (identifier) @name)) @def.import
+; `import a.b.C;` binds C; `import a.b.*;` (trailing asterisk) binds no
+; single name, so the anchor requires the scoped_identifier to be last.
+(import_declaration (scoped_identifier name: (identifier) @name) .) @def.import
 (import_declaration (scoped_identifier) @name) @ref.import
 (import_declaration (identifier) @name) @ref.import
 (method_invocation name: (identifier) @name) @ref.call

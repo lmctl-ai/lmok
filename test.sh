@@ -1266,4 +1266,39 @@ ok "outline whole-file line budgets and exact truncation counts"
 python3 tests/check-outline.py "$HOST" errors || fail "outline errors"
 ok "outline invalid options, missing input and corrupt DB errors"
 
+# --- review (main-line enhancement wave): index after lint --db, --changed revision hardening, import bindings ---
+mkdir -p "$WORK/revidx/src"
+printf 'int main(void) { gets(0); return 0; }\n' > "$WORK/revidx/src/a.c"
+printf 'int helper(void) { return 1; }\n' > "$WORK/revidx/src/b.c"
+REVHOST="$HERE/$HOST"; case "$HOST" in /*) REVHOST="$HOST";; esac
+(cd "$WORK/revidx" && "$REVHOST" lint "$HERE/examples/rules/c-security.json" src --db t.db >/dev/null) || fail "revidx lint --db"
+out="$(cd "$WORK/revidx" && "$REVHOST" index --db t.db src)" || fail "revidx index run: $out"
+[ "$out" = "indexed 2 files (0 unchanged, 0 removed)" ] || fail "index after lint --db must extract the lint-created files rows: $out"
+out="$(cd "$WORK/revidx" && "$REVHOST" symbols --db t.db helper)" || fail "revidx symbols"
+[[ "$out" == *"helper function src/b.c"* ]] || fail "symbols after lint-then-index: $out"
+out="$(cd "$WORK/revidx" && "$REVHOST" index --db t.db src)" || fail "revidx re-index"
+[ "$out" = "indexed 0 files (2 unchanged, 0 removed)" ] || fail "second index must see extracted rows as unchanged: $out"
+ok "index: files rows created by lint --db (no extraction) are indexed, not skipped as unchanged"
+
+for rev in -O/etc/passwd --quiet -; do
+  set +e; out="$("$HOST" lint examples/rules/c-security.json examples/data/sample.c "--changed=$rev" 2>&1)"; code=$?; set -e
+  [ "$code" = 2 ] && [[ "$out" == *"bad --changed revision '$rev' (must not start with '-')"* ]] || fail "--changed=$rev must be refused (exit $code): $out"
+done
+ok "lint --changed: option-looking revisions are refused (exit 2) instead of being parsed by git"
+
+printf 'import { a as b, c } from "m";\nimport def, * as ns from "n";\n' > "$WORK/imports.js"
+cp "$WORK/imports.js" "$WORK/imports.ts"; cp "$WORK/imports.js" "$WORK/imports.tsx"
+printf 'import java.util.*;\nimport java.util.List;\nimport static java.lang.Math.*;\nclass K {}\n' > "$WORK/imports.java"
+python3 - "$HOST" "$WORK" <<'PY_IMPORTS'
+import json, subprocess, sys
+host, work = sys.argv[1:]
+def defs(path):
+    out = subprocess.run([host, 'facts', path], capture_output=True, check=True, text=True).stdout
+    return sorted(json.loads(l)['name'] for l in out.splitlines() if json.loads(l)['kind'] == 'def.import')
+for ext in ('js', 'ts', 'tsx'):
+    assert defs(f'{work}/imports.{ext}') == ['b', 'c', 'def', 'ns'], (ext, defs(f'{work}/imports.{ext}'))
+assert defs(f'{work}/imports.java') == ['List'], defs(f'{work}/imports.java')
+PY_IMPORTS
+ok "facts: import bindings — JS/TS/TSX aliased specifiers bind the alias only; Java wildcard imports bind no name"
+
 echo "PASS: $pass checks"

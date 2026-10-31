@@ -71,9 +71,9 @@ Baseline load_baseline_file(const std::string &path);
 // reports for the repository containing the current working directory
 // (rev defaults to HEAD at the call site: working tree vs HEAD). Throws
 // BaselineError outside a git repository, when git is missing, or when the
-// revision is unknown or contains characters outside [A-Za-z0-9._/~^-]
-// (the whitelist keeps the popen'd command line injection-free on both sh
-// and cmd.exe).
+// revision is unknown, is empty, starts with '-' (git would read it as an
+// option) or contains characters outside [A-Za-z0-9._/~^-] (the whitelist
+// keeps the popen'd command line injection-free on both sh and cmd.exe).
 std::set<std::string> git_changed_files(const std::string &rev);
 
 } // namespace lmok

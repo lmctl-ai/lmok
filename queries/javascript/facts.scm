@@ -6,8 +6,9 @@
 (variable_declarator name: (identifier) @name) @def.variable
 (import_clause (identifier) @name) @def.import
 (namespace_import (identifier) @name) @def.import
+; `import { a as b }` binds b only: the source name is not a local binding.
 (import_specifier alias: (identifier) @name) @def.import
-(import_specifier name: (identifier) @name) @def.import
+(import_specifier !alias name: (identifier) @name) @def.import
 
 (import_statement source: (string) @name) @ref.import
 (export_statement source: (string) @name) @ref.import

@@ -208,6 +208,10 @@ Baseline load_baseline_file(const std::string &path) {
 }
 
 std::set<std::string> git_changed_files(const std::string &rev) {
+  // A leading '-' would be parsed by git as an OPTION (`--quiet` lints nothing
+  // and exits 0; `-O<file>` reorders the working-tree diff): refuse it.
+  if (rev.empty() || rev.front() == '-')
+    throw BaselineError("bad --changed revision '" + rev + "' (must not start with '-')");
   for (const char c : rev) {
     const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
                     c == '.' || c == '_' || c == '/' || c == '~' || c == '^' || c == '-';
