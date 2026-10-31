@@ -1,6 +1,6 @@
 # Chapter: Rules - a rule catalog with severities and a quality gate
 # Shows: ts.report rule/severity metadata, json_parse over ts.report_json, script-side gating
-# Run: lmscript examples/rule-catalog.lms      (then: build/lmok --lmcode build/rule-catalog.dslb)
+# Run: lmscript examples/rule-catalog.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the C source is embedded below.
 # exit: 0

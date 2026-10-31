@@ -1,21 +1,19 @@
 # Examples
 
 Run from the repository root after the [build and setup](../README.md#build-and-run).
-Use `lmscript` >= 0.2.444 with the matching host on PATH:
+Use a source compiler with program/builder support (Mono main 0255ef01 or later) with the matching host on PATH:
 
 ```sh
 export PATH="$PWD/build:$PATH"
 mkdir -p build
 lmscript examples/parse-string.lms
-build/lmok --lmcode build/parse-string.dslb
 ```
 
-The outer script constructs a program and calls run_lmcode. A standalone
-positional argument to `lmscript` is a script argument, not an output-path
-option. Compilation is normally silent. Execution prints the JSON text,
-its tree, `has_error -> false`, `nodes -> 34`, and the host success record
-`{"ok": true, "result": null}`. Each script's `# expect:` / `#|` comments
-list its expected program output; `--lmcode` adds the success record.
+The outer script constructs an opaque program and calls run_lmcode. Positional
+arguments belong to the script; there is no public bytecode output option.
+Execution forwards tree/count diagnostics and tagged host summaries; run_lmcode
+returns the success or failure envelope to the script. Each script's expect
+comments pin its domain output.
 
 The `install="github:lmctl-ai/lmok@latest"` declaration can resolve a
 published host when one is not on PATH, once maintainers publish renamed
@@ -24,15 +22,11 @@ not a fixed version pin. Compilation is offline once the local host and
 compiler are available. Raw URL invocation and its working-directory
 requirements are covered in the [README](../README.md#published-host-and-raw-urls).
 
-Run all 17 examples (12 bytecode demos and five outer-script CLI demos):
+Run the program and ordinary CLI examples:
 
 ```sh
 for source in examples/*.lms; do
   lmscript "$source" || exit 1
-  case "$source" in
-    examples/lint-repo.lms|examples/lint-go.lms|examples/lint-javascript.lms|examples/lint-typescript.lms|examples/lint-tsx.lms) ;; # drives the CLI directly
-    *) build/lmok --lmcode "build/$(basename "$source" .lms).dslb" || exit 1 ;;
-  esac
 done
 ```
 

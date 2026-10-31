@@ -1,6 +1,6 @@
 # Chapter: Incremental - edit, reparse, re-lint (tier-2 E5)
 # Shows: Tree.edit, ts.reparse_c, ts.changed_ranges, re-linting the NEW tree
-# Run: lmscript examples/incremental-reparse.lms      (then: build/lmok --lmcode build/incremental-reparse.dslb)
+# Run: lmscript examples/incremental-reparse.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the C source is embedded below.
 # exit: 0

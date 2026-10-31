@@ -1,6 +1,6 @@
 # Chapter: Files - parse a JSON file from disk
 # Shows: file_read, ts.parse, Tree.sexp/has_error/node_count
-# Run: lmscript examples/parse-file.lms      (then: build/lmok --lmcode build/parse-file.dslb)
+# Run: lmscript examples/parse-file.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: reads examples/data/sample.json, run from the repository root.
 # exit: 0

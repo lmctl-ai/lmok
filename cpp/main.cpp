@@ -1475,10 +1475,10 @@ static int run_cli(int argc, char **argv) {
     lmok::Grammar grammar = lmok::Grammar::Json;
     if (argi + 1 < argc && std::string(argv[argi]) == "--lang") {
       const std::string lang = argv[argi + 1];
-      if (!parse_lang(lang, grammar)) { std::cerr << "unknown language '" << lang << "' (known: json, c, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)\n"; return 2; }
+      if (!parse_lang(lang, grammar)) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE","unknown check language: "+lang));
       argi += 2;
     }
-    if (argi + 1 >= argc) { std::cerr << usage; return 2; }
+    if (argi + 1 >= argc) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));
     // --sarif FILE may appear once among the positionals; the rest are the
     // bytecode then its input files/dirs.
     std::optional<std::string> sarif_path;
@@ -1489,10 +1489,10 @@ static int run_cli(int argc, char **argv) {
         sarif_path = argv[++i];
         continue;
       }
-      if (arg.empty() || arg.rfind("--", 0) == 0) { std::cerr << usage; return 2; }
+      if (arg.empty() || arg.rfind("--", 0) == 0) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));
       check_inputs.push_back(arg);
     }
-    if (check_inputs.size() < 2) { std::cerr << usage; return 2; }
+    if (check_inputs.size() < 2) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));
     const std::string schema(reinterpret_cast<const char *>(lmok::embedded_schema), lmok::embedded_schema_size);
     auto results=dslvm::InvocationResults::from_command({check_inputs[0]});
     const auto fail_check=[&](const std::string& phase,const dslvm::Error& error){results.fail(0,phase,error);return results.write_frame(std::cout);};
@@ -1500,7 +1500,7 @@ static int run_cli(int argc, char **argv) {
     try { program = dslvm::Program::load(read_bytecode(check_inputs[0]), schema, reg); }
     catch (const dslvm::Error &error) { return fail_check("load", error); }
     std::vector<Target> check_targets;
-    if(const int rc=expand_targets(std::vector<std::string>(check_inputs.begin()+1,check_inputs.end()),0,check_targets,&grammar))return rc;
+    if(const int rc=expand_targets(std::vector<std::string>(check_inputs.begin()+1,check_inputs.end()),0,check_targets,&grammar)){(void)rc;results.fail(std::nullopt,"run",dslvm::Error("RUN_HOST","cannot expand check inputs"));return results.write_frame(std::cout);}
     std::map<std::string, std::vector<size_t>> by_kind;
     for (size_t i = 0; i < program.entries().size(); ++i) {
       const auto &entry = program.entries()[i];

@@ -1,7 +1,7 @@
 # Chapter: Rules - semgrep-style code patterns from lmcode (ts.match_c / ts.match_python)
 # Shows: ts.match_c(root, "strcpy($DST, $SRC)") and ts.match_python(root, "eval($X)") return the matched
 #        nodes (the whole call), so a rule needs no S-expression; metavariables bind any one node.
-# Run: lmscript examples/pattern-rules.lms      (then: build/lmok --lmcode build/pattern-rules.dslb)
+# Run: lmscript examples/pattern-rules.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the C and Python sources are embedded below.
 # exit: 0

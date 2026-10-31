@@ -1,6 +1,6 @@
 # Chapter: Basics - parse an inline JSON string
 # Shows: ts.parse, Tree.sexp/has_error/node_count, string concat
-# Run: lmscript examples/parse-string.lms      (then: build/lmok --lmcode build/parse-string.dslb)
+# Run: lmscript examples/parse-string.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the JSON text is embedded below.
 # exit: 0

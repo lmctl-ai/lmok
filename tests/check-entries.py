@@ -164,8 +164,10 @@ class EntryChecks(unittest.TestCase):
         r=self.run_host(binary,self.work/'missing.json')
         self.assertEqual(r.returncode,3,r.stdout+r.stderr)
         self.assertIn('cannot read',r.stdout+r.stderr)
+        failure=json.loads(r.stdout.splitlines()[-2]);self.assertFalse(failure['ok']);self.assertEqual(failure['phase'],'run');self.assertNotIn('result',failure)
         r=subprocess.run([HOST,'check'],capture_output=True)
         self.assertEqual(r.returncode,2)
+        value=json.loads(r.stdout.splitlines()[-2]);self.assertEqual(value['phase'],'cli');self.assertNotIn('result',value)
 
 if __name__ == '__main__':
     unittest.main()

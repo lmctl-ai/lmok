@@ -1,6 +1,6 @@
 # Chapter: Rules - lint C code for unsafe calls and FIXMEs
 # Shows: ts.parse_c/query_c (C grammar), @call_expression/@comment rules, ts.report with rule key + severity
-# Run: lmscript examples/lint-c.lms      (then: build/lmok --lmcode build/lint-c.dslb)
+# Run: lmscript examples/lint-c.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the C source is embedded below.
 # exit: 0

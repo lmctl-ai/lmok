@@ -1,6 +1,6 @@
 # Chapter: Interop - emit SARIF 2.1.0 for the lint-c rules
 # Shows: SARIF emission via string building, severity->level mapping in script, 0-based -> 1-based conversion, file_write
-# Run: lmscript examples/sarif-report.lms      (then: build/lmok --lmcode build/sarif-report.dslb)
+# Run: lmscript examples/sarif-report.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the C source is embedded below. Writes build/sarif-results.sarif.
 # exit: 0

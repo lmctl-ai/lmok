@@ -1,6 +1,6 @@
 # Chapter: Rules - lint a JSON document with the NodeList idiom
 # Shows: Tree.nodes + foreach, @NODE-KIND annotations, fn ... implements Rule, int predicate helpers
-# Run: lmscript examples/lint-json.lms      (then: build/lmok --lmcode build/lint-json.dslb)
+# Run: lmscript examples/lint-json.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the JSON fixture is embedded below.
 # exit: 0

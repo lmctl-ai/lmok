@@ -1,6 +1,6 @@
 # Chapter: Rules - select nodes with a tree-sitter query
 # Shows: ts.query, S-expression patterns with @captures, Tree.root, ts.report_json/report_count
-# Run: lmscript examples/query-json.lms      (then: build/lmok --lmcode build/query-json.dslb)
+# Run: lmscript examples/query-json.lms
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the JSON fixture is embedded below.
 # exit: 0
