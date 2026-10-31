@@ -11,7 +11,7 @@ try {
  const engine=new LMScript();let bytes;
  engine.registerFunction('fixture_capture',p=>{bytes=new Uint8Array(CompiledDsl.bytesOf(p));return null;},1,{isDefault:true});
  let raw=fs.readFileSync(source,'utf8');
- const lines=raw.split('\n');const start=lines.findIndex(l=>/\b\w+\s*=\s*_lmcode_/.test(l));
+ const lines=raw.split('\n').map(l=>l.endsWith('\r')?l.slice(0,-1):l);const start=lines.findIndex(l=>/\b\w+\s*=\s*_lmcode_/.test(l));
  const end=lines.findIndex((l,i)=>i>start&&l==='end _lmcode_');if(start<0||end<0)throw Error('fixture requires one lmcode literal');
  const variable=lines[start].match(/(\w+)\s*=\s*_lmcode_/)[1];
  lines[start]=variable+' = _lmcode_ schema='+JSON.stringify(path.resolve('schema/lmok.dsl.json'))+';';
