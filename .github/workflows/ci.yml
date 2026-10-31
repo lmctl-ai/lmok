@@ -108,11 +108,10 @@ jobs:
         if: env.ONLY_OK == 'true'
         shell: bash
         run: |
-          # The npm CLI package ships no compiler library (dist/dsl.js), which
-          # fixture compilation imports; build the pinned workspace instead.
-          # The pin lives in compiler.lock (aligned with scripts/select-compiler.sh).
-          LMSCRIPT_BIN="$(scripts/bootstrap-compiler.sh)"
-          echo "LMSCRIPT_BIN=$LMSCRIPT_BIN" >> "$GITHUB_ENV"
+          # 0.2.451 is the first npm package shipping the compiler library
+          # (dist/dsl.js) that fixture compilation imports.
+          # scripts/bootstrap-compiler.sh remains the from-source fallback.
+          npm i -g @lmctl-ai/lmctl@0.2.451
           scripts/select-compiler.sh | tee compiler.txt
           grep -q lmscript compiler.txt || { echo "no v6 compiler available"; exit 1; }
 
