@@ -1,6 +1,6 @@
 # Chapter: Rules - lint a JSON document with the host findings sink
 # Shows: ts.report/report_json/report_count, Tree.nodes + foreach, @NODE-KIND fn ... implements Rule
-# Run: lmscript examples/report-json.lms      (then: build/lmok --dsl build/report-json.dslb)
+# Run: lmscript examples/report-json.lms      (then: build/lmok --lmcode build/report-json.dslb)
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the JSON fixture is embedded below.
 # exit: 0

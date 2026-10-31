@@ -62,7 +62,7 @@ and rule fixtures, including native OS byte/path/linkage checks on every matrix 
 
 ```sh
 lmscript examples/parse-string.lms
-build/lmok --dsl build/parse-string.dslb
+build/lmok --lmcode build/parse-string.dslb
 ```
 
 The first command saves bytecode; the second prints the JSON text, its tree,
@@ -104,7 +104,7 @@ From the repository root (or an empty directory for this inline-data example):
 ```sh
 mkdir -p build
 lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmok/main/examples/parse-string.lms
-lmok --dsl build/parse-string.dslb
+lmok --lmcode build/parse-string.dslb
 ```
 
 With a local build, use `build/lmok` for the second command. The local
@@ -124,8 +124,8 @@ must exist before compilation.
 ```
 lmok --version
 lmok --notices
-lmok --dsl-schema [--json]
-lmok --dsl-signatures
+lmok --lmcode-schema [--json]
+lmok --lmcode-signatures
 lmok parse [--lang json|c|python|bash|java|go|javascript|typescript|tsx] FILE       # '-' reads stdin
 lmok query [--lang json|c|python|bash|java|go|javascript|typescript|tsx] [--pattern] PATTERN FILE  # '-' reads stdin
 lmok lint RULES.json FILE|DIR... [--db PATH] [--no-suppress] [--sarif FILE]
@@ -135,7 +135,7 @@ lmok rules PACK... | test PACK FIXTURE...
 lmok findings [--rule ID] [--file PATH] [--db PATH]
 lmok facts [--lang json|c|python|bash|java|go|javascript|typescript|tsx] FILE|DIR...
 lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]
-lmok --dsl FILE [FILE ...]
+lmok --lmcode FILE [FILE ...]
 ```
 
 `parse` prints the concrete syntax tree as a single-line s-expression, like
@@ -172,7 +172,7 @@ $ lmok lint examples/rules/c-security.json examples/data/sample.c
 1 findings in examples/data/sample.c
 ```
 
-The `--dsl` interface runs the body of lmscript bytecode against the same engine
+The `--lmcode` interface runs the body of lmscript bytecode against the same engine
 with structured access to parsed trees. `check RULES.dslb FILE|DIR... [--no-suppress]` is the v6
 entry path: it loads one DSLB file, indexes entries by annotation, runs its
 body once, then parses and walks each explicit input file once. It dispatches
@@ -192,7 +192,7 @@ silently dead; a rules file is therefore specific to one `--lang`. lmcode byteco
 format, so old bytecode must be recompiled. Install the private compiler with
 `npm install --prefix /tmp/lmok-tools @lmctl-ai/lmctl@0.2.444` when needed.
 
-Successful `--dsl` programs and `check` invocations append a terminal frame after
+Successful `--lmcode` programs and `check` invocations append a terminal frame after
 the existing diagnostics (and after successful SARIF output):
 
 ```text
@@ -202,8 +202,8 @@ LMCODE_RETURN_END
 ```
 
 The payload is the invocation's `$return` value, or `null` when unset. Body and
-rule-entry writes share the sink across all nodes and input files; `--dsl`
-continues to run only the body. Each program in a multi-program `--dsl` command
+rule-entry writes share the sink across all nodes and input files; `--lmcode`
+continues to run only the body. Each program in a multi-program `--lmcode` command
 gets its own result. Runtime or application failures emit no frame. Finding
 IDs, order, suppression and entry HALT values retain their existing meanings.
 The [body/entry return example](examples/invocation-return.lmcode) requires the
@@ -506,8 +506,8 @@ a candidate set, never a resolution.
 ## Scripting
 
 Save this as `build/show.lms` after the setup above, run
-`lmscript build/show.lms`, then `build/lmok --dsl build/show.dslb`.
-The script saves bytecode; `--dsl` executes it.
+`lmscript build/show.lms`, then `build/lmok --lmcode build/show.dslb`.
+The script saves bytecode; `--lmcode` executes it.
 
 ```lmscript
 p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
@@ -530,7 +530,7 @@ root) and `.parent()` (a located run-time error at the root). The schema also de
 annotation and an `implements Rule` clause (checked at compile time), so
 analysis rules are user-redefinable scripts over the CST — see
 [examples/cst-rules.lms](examples/cst-rules.lms) and [durable-memory/03-rule-methods.md](durable-memory/03-rule-methods.md). The v6 `check` command
-dispatches these entries by annotation; ordinary `--dsl` execution remains body-driven. Rule methods
+dispatches these entries by annotation; ordinary `--lmcode` execution remains body-driven. Rule methods
 require `lmscript` >= 0.2.444. Since v0.2.1, `Tree.nodes()` returns a
 `NodeList` (flat pre-order list of named nodes, root first; `.len()` and
 bounds-checked `.at(i)`), so `for (n in tree.nodes())` runs a whole-tree scan
@@ -634,7 +634,7 @@ deduplicated. Metadata is classification guidance, not proof of exploitability.
 include a `metadata` object on findings that declare it. Without the flag,
 existing JSON bytes remain unchanged. Entry rules use
 `ts.report_meta(node, message, id, severity, metadata_json_string)`; the JSON
-uses the same keys/validation as packs. `--dsl ... --metadata` also opts in.
+uses the same keys/validation as packs. `--lmcode ... --metadata` also opts in.
 The structured fields are available to SARIF writers in `RuleMetadata`.
 
 `lmok test PACK FIXTURE...` compares finding (line, rule) sets against trailing
@@ -762,4 +762,4 @@ See [the grammar contract and S5 seam](durable-memory/15-script-languages.md).
 
 ## Historical literal names
 
-The documentation calls the language lmcode. `--dsl`, `--dsl-schema` and `--dsl-signatures` are current host flag literals; `DSLB` is the bytecode magic and `DSLB v6` is the current format name; `.dslb` is the current bytecode filename extension; `_dsl_` is the historical block spelling. Other code-formatted API names, paths, manifest names and diagnostic text retain their current literal spellings.
+The documentation calls the language lmcode. `--lmcode`, `--lmcode-schema` and `--lmcode-signatures` are current host flag literals; `DSLB` is the bytecode magic and `DSLB v6` is the current format name; `.dslb` is the current bytecode filename extension; `_dsl_` is the historical block spelling. Other code-formatted API names, paths, manifest names and diagnostic text retain their current literal spellings.

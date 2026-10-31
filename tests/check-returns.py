@@ -78,7 +78,7 @@ class ReturnChecks(unittest.TestCase):
 
     def test_body_float_uses_shortest_round_trip_frame(self):
         binary = self.compile("lmcode_return_set(0.1 + 0.2);", "float")
-        result = self.host_run("--dsl", binary)
+        result = self.host_run("--lmcode", binary)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertTrue(result.stdout.endswith("LMCODE_RETURN_END\n"), repr(result.stdout))
         self.assertEqual(self.frame(result.stdout), 0.30000000000000004)
@@ -86,7 +86,7 @@ class ReturnChecks(unittest.TestCase):
 
     def test_unset_result_is_null_frame(self):
         binary = self.compile("let untouched = 1;", "unset")
-        result = self.host_run("--dsl", binary)
+        result = self.host_run("--lmcode", binary)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIsNone(self.frame(result.stdout))
 
@@ -123,7 +123,7 @@ class ReturnChecks(unittest.TestCase):
 
     def test_scalar_field_failure_has_no_frame(self):
         binary = self.compile('lmcode_return_set(7); lmcode_return_put("field", 1);', "scalar")
-        result = self.host_run("--dsl", binary)
+        result = self.host_run("--lmcode", binary)
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("LMCODE_RETURN_BEGIN", result.stdout)
 
@@ -135,7 +135,7 @@ class ReturnChecks(unittest.TestCase):
             '}\n',
             "body-only",
         )
-        result = self.host_run("--dsl", binary)
+        result = self.host_run("--lmcode", binary)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertEqual(self.frame(result.stdout), {"body": "yes"})
 
@@ -143,7 +143,7 @@ class ReturnChecks(unittest.TestCase):
         first = self.compile('lmcode_return_set("first");', "first")
         second = self.compile('lmcode_return_set("second");', "second")
         unset = self.compile("let untouched = 1;", "between")
-        result = self.host_run("--dsl", first, unset, second)
+        result = self.host_run("--lmcode", first, unset, second)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertEqual(result.stdout.count("LMCODE_RETURN_BEGIN\n"), 3)
         self.assertEqual(result.stdout.count("LMCODE_RETURN_END\n"), 3)
@@ -179,7 +179,7 @@ class ReturnChecks(unittest.TestCase):
         self.assertNotIn("LMCODE_RETURN_BEGIN", result.stdout)
 
     def test_real_return_syntax_body_fixture(self):
-        result = self.host_run("--dsl", ROOT / "tests/fixtures/returns/body.dslb")
+        result = self.host_run("--lmcode", ROOT / "tests/fixtures/returns/body.dslb")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertEqual(result.stdout, '{"ok": true, "result": null}\nLMCODE_RETURN_BEGIN\n0.30000000000000004\nLMCODE_RETURN_END\n')
 

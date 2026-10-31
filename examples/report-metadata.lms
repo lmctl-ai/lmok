@@ -1,7 +1,7 @@
 # Chapter: Rules - optional classification metadata
 # Shows: ts.report_meta and byte-compatible default report_json
 # Run: lmscript examples/report-metadata.lms
-# Then: lmok --dsl build/report-metadata.dslb --metadata
+# Then: lmok --lmcode build/report-metadata.dslb --metadata
 # Needs: README setup; local lmok on PATH. No network or provider calls.
 # exit: 0
 # expect:

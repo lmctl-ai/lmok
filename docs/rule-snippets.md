@@ -63,7 +63,7 @@ the direct analog of esquery selectors and `nodesToVisit()` combined.
 
 - **Rules = annotated functions in a `.lms` snippet.** Compile it to a v6 `.dslb`;
   `lmok check rule.dslb FILE...` dispatches annotated entries by
-  tree-sitter node kind. `lmok --dsl rule.dslb` remains the body/configuration
+  tree-sitter node kind. `lmok --lmcode rule.dslb` remains the body/configuration
   path, and `lmctl autorun rules/no-foo.lms` remains useful for scripts without
   host entry dispatch.
 - **Selector**: `@kind` for host entry dispatch; `ts.query(node, pattern)`
@@ -102,7 +102,7 @@ savedsl(p, "build/lmb001.dslb");
 
 The host walks once and supplies matching nodes. Finding IDs remain the explicit
 report payload, not the function name. Body-oriented examples are still valid
-with `--dsl`, including scripts that build SARIF files from `ts.report_json()`.
+with `--lmcode`, including scripts that build SARIF files from `ts.report_json()`.
 
 ## Non-goals (v1)
 

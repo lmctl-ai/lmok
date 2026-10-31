@@ -15,7 +15,7 @@ files). lmcode snippets stay the policy layer and gain DB access.
 
 ## 1. CLI shape
 
-New/changed verbs (existing `parse`/`query`/`lint`/`--dsl` behavior unchanged):
+New/changed verbs (existing `parse`/`query`/`lint`/`--lmcode` behavior unchanged):
 
 ```
 lmok index [DIR...] [--db PATH] [--force]
@@ -245,8 +245,8 @@ tree treats key paths as structure:
 
 ## 4. lmcode integration
 
-Scripts run under `lmok --dsl rule.dslb`; the DB is opened from the same
-resolution chain (`--db` flag added to `--dsl`, then `LMOK_DB`, then
+Scripts run under `lmok --lmcode rule.dslb`; the DB is opened from the same
+resolution chain (`--db` flag added to `--lmcode`, then `LMOK_DB`, then
 `.lmok/`). New builtins are methods on the existing `Ts` context, declared in
 `schema/lmok.host.json` and registered with `reg.method` in
 `cpp/main.cpp` — same style as `ts.query_c`. Structured results come back as

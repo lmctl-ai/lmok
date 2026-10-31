@@ -135,7 +135,7 @@ for source in rules/lmcode/*.lms; do
     read -r lang input <<< "$spec"
     build/lmok check --lang "$lang" "$bytecode" "$input" || exit 1
   else
-    build/lmok --dsl "$bytecode" || exit 1
+    build/lmok --lmcode "$bytecode" || exit 1
   fi
 done
 ```

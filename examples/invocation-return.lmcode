@@ -1,5 +1,5 @@
 // Body for _lmcode_ with lmok's schema (requires compiler slice 3).
-// `lmok --dsl` runs this body only and frames {"checked":true} after success.
+// `lmok --lmcode` runs this body only and frames {"checked":true} after success.
 $return.checked = true;
 // `lmok check --lang json` additionally dispatches this entry for each pair.
 // Writes share the body sink; rule IDs still come exclusively from ts.report.

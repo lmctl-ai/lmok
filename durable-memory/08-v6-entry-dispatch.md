@@ -9,7 +9,7 @@ handles and findings, parses once with the selected grammar, and performs one
 pre-order cursor walk over all CST nodes, including anonymous kinds. Every
 entry whose annotation equals the node kind is called with a `Node` handle.
 Directories and stdin are intentionally outside this command; cross-file
-aggregation remains a body-level `--dsl` responsibility.
+aggregation remains a body-level `--lmcode` responsibility.
 
 Each annotation must name a kind the walk can visit in the selected grammar (a named node, an
 anonymous token or `ERROR`, checked with `ts_language_symbol_for_name`/`ts_language_symbol_type`);
@@ -26,7 +26,7 @@ Each input emits the report JSON array, `N findings in FILE` (FILE as given on t
 the same line `lint` prints) and the standard success record; body findings, when any, are a
 group of their own (`N findings in body`) before the first file. Inputs are processed in argument
 order. An entry failure prints the partial group collected so far, then the located run-phase
-error record, and stops the run with exit 3 (WP14 F2/F5/F6). `--dsl` continues to run only the body, preserving
+error record, and stops the run with exit 3 (WP14 F2/F5/F6). `--lmcode` continues to run only the body, preserving
 existing scripts and rule files that perform their own traversal.
 
 The host schema already declares `Rule` and `Node`; changing those exact schema

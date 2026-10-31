@@ -49,7 +49,7 @@ class JavaOS(unittest.TestCase):
   body='let t = ts.parse_java("class A {}"); println(t.root().kind()); for (n in ts.query_java(t.root(), "(identifier) @id")) { println(n.text()); } let next = ts.reparse_java(t, "class A {}"); println(next.root().kind());'
   source.write_text('p = _lmcode_ schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json'))+';\n'+body+'\nend _lmcode_\nsavedsl(p, ARGV[0]);\n',encoding='utf-8')
   r=subprocess.run([compiler,str(source),str(binary)],capture_output=True,cwd=ROOT,timeout=30);self.assertEqual(r.returncode,0,r.stderr)
-  self.assertEqual(self.run_host('--dsl',binary),b'program\nA\nprogram\n{"ok": true, "result": null}\nLMCODE_RETURN_BEGIN\nnull\nLMCODE_RETURN_END\n')
+  self.assertEqual(self.run_host('--lmcode',binary),b'program\nA\nprogram\n{"ok": true, "result": null}\nLMCODE_RETURN_BEGIN\nnull\nLMCODE_RETURN_END\n')
  def test_rule_omission_controls(self):
   pack=json.loads((ROOT/'rules/java-tier1.json').read_text(encoding='utf-8'))
   expected=collections.Counter({**{'LJV%03d'%i:1 for i in range(1,10)},'LJV008':2})

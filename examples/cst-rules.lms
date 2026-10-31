@@ -1,6 +1,6 @@
 # Chapter: Rules - CST rules as annotated lmcode functions
 # Shows: @NODE-KIND annotations, fn ... implements Rule, Tree.root, Node.kind/text/start_row/start_col/child_count/child
-# Run: lmscript examples/cst-rules.lms      (then: build/lmok --dsl build/cst-rules.dslb)
+# Run: lmscript examples/cst-rules.lms      (then: build/lmok --lmcode build/cst-rules.dslb)
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: nothing else (offline).
 # exit: 0

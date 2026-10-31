@@ -2,12 +2,12 @@
 
 The vendored C++ SDK owns the return conversion and terminal framing code.
 `cpp/main.cpp` binds one host-owned `dslvm::ResultSink` to the registry before
-execution. `--dsl` resets it once for each program; `check` retains it across the
+execution. `--lmcode` resets it once for each program; `check` retains it across the
 body and all node/entry calls in all input files. Per-file findings/Node arena
 resets do not reset this sink. Its contents are owned copies, independent of
 standard arenas and later mutation.
 
-Successful `--dsl` programs emit their existing success diagnostic followed by
+Successful `--lmcode` programs emit their existing success diagnostic followed by
 exactly one terminal `LMCODE_RETURN_BEGIN` / compact JSON / `LMCODE_RETURN_END`
 frame. Successful `check` emits one frame after all findings groups and after
 successful SARIF writing. No writes means a mandatory null payload. Failed

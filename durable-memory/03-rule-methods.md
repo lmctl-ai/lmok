@@ -57,7 +57,7 @@ the TODO in scripts/select-compiler.sh).
   65536-handle cap with Tree.nodes() lists; Node handles have their own
   1<<20 cap and `NodeList.at(i)` hands out a pointer INTO the list (no
   handle allocated per visit, so walking a 180k-node tree is fine); all
-  arenas reset before each `--dsl` program, so caps are per run. Nodes
+  arenas reset before each `--lmcode` program, so caps are per run. Nodes
   borrow the owning Tree (arena lifetime).
 - **Beyond JSON** (LANDED in v0.2.4): tree-sitter-c (master commit `b780e47`,
   no external scanner — parser.c only, ABI 15) is vendored and compiled like
@@ -76,7 +76,7 @@ the TODO in scripts/select-compiler.sh).
   `implements Rule` fixes the signature to `(Node) -> void`), so
   `examples/lint-json.lms` needs int predicate helpers evaluated twice.
   LANDED in v0.2.2: the host findings sink — `ts.report(node, message)` /
-  `ts.report_count()` / `ts.report_json()` (per-`--dsl`-file state in the
+  `ts.report_count()` / `ts.report_json()` (per-`--lmcode`-file state in the
   Host arena, reset before each program run like the SDK's per-run collection
   reset; capped at 65536 findings). Rules are now just annotated void fns
   calling `ts.report`; rendering stays script-side. See
@@ -136,7 +136,7 @@ the TODO in scripts/select-compiler.sh).
 ./test.sh   # needs lmscript >= 0.2.442 on PATH; released 0.2.420 fails at
             # check 8: schema error "unknown top-level key interfaces"
 lmscript examples/cst-rules.lms build/cst-rules.dslb
-build/lmok --dsl build/cst-rules.dslb
+build/lmok --lmcode build/cst-rules.dslb
 # finding: password key "password" at row 4 col 4
 # finding: placeholder string "TODO" at row 6 col 9
 # {"ok": true, "result": null}

@@ -54,7 +54,7 @@ and [dist branch](https://github.com/lmctl-ai/lmok/tree/dist) each expose
 five platform executables plus SHA256SUMS. Only Linux ARM64 was executed;
 asset presence does not establish runtime correctness on the other four.
 
-Verified local and raw-URL `lmctl autorun` forms, followed by `--dsl`.
+Verified local and raw-URL `lmctl autorun` forms, followed by `--lmcode`.
 After creating the output directory, the raw parse-string example also ran
 successfully in an otherwise empty directory within the workspace.
 
@@ -68,7 +68,7 @@ commands succeeded unchanged. No extra SDK checkout/sync was necessary.
 All 13 examples and all nine lmcode rule demos passed their declared
 expected output against the downloaded v0.4.0 executable after the documented
 setup omissions were supplied. `lint-repo.lms` ran as an outer script;
-the other 21 programs were compiled and executed with `--dsl`.
+the other 21 programs were compiled and executed with `--lmcode`.
 
 The local test suite passed **53/53 checks**, including all examples, nine
 violation/clean rule pairs, SARIF structure and fully static linkage.

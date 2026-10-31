@@ -1,6 +1,6 @@
 # Chapter: Errors - detect malformed JSON
 # Shows: ts.parse, Tree.has_error, ERROR nodes in the s-expression tree
-# Run: lmscript examples/detect-error.lms      (then: build/lmok --dsl build/detect-error.dslb)
+# Run: lmscript examples/detect-error.lms      (then: build/lmok --lmcode build/detect-error.dslb)
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the malformed JSON text is embedded below.
 # exit: 0

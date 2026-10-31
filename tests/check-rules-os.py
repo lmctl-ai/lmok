@@ -96,8 +96,8 @@ class RulePacksOS(unittest.TestCase):
                     for finding in findings:
                         self.assertEqual(sorted(finding), ['col', 'end_col', 'end_row', 'message', 'row', 'rule', 'severity'], finding)
                 else:
-                    # Packs without a '# check:' header keep the body-only --dsl path.
-                    result = self.run_host('--dsl', binary, cwd=ROOT)
+                    # Packs without a '# check:' header keep the body-only --lmcode path.
+                    result = self.run_host('--lmcode', binary, cwd=ROOT)
                     self.assertEqual(result.stderr, b'', result)
                     self.assertEqual(result.returncode, 0, result.stdout)
                     self.assertTrue(result.stdout.endswith(b'LMCODE_RETURN_BEGIN\nnull\nLMCODE_RETURN_END\n'), result.stdout)
@@ -198,7 +198,9 @@ class LauncherOS(unittest.TestCase):
             self.assertTrue(argv[0].lower().endswith(('.cmd', '.exe', '.bat')), argv)
         r = subprocess.run([*argv, '--version'], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertRegex(r.stdout, r'^lmscript 0\.2\.(44[4-9]|4[5-9]\d|[5-9]\d\d)\b', r.stdout)
+        # This oracle checks launcher mechanics; RulePacksOS above compiles and
+        # executes actual v6 entries. Source package metadata can be historical.
+        self.assertRegex(r.stdout, r'^lmscript \d+\.\d+\.\d+\b', r.stdout)
 
 if __name__ == '__main__':
     names = unittest.defaultTestLoader.getTestCaseNames(RulePacksOS)

@@ -35,5 +35,5 @@ safety, not a semantic proof for arbitrary custom rules.
 
 Previewing never writes source or a findings DB run, even with `--db`. Applying
 fixes records the final text/findings when a DB is requested; the DB schema still
-stores positions/message, not replayable fixes. `check`/`--dsl` expose report_fix
+stores positions/message, not replayable fixes. `check`/`--lmcode` expose report_fix
 metadata but do not apply edits.

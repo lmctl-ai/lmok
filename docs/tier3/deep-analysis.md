@@ -497,7 +497,7 @@ property that a static tool must not pretend to know.
 4. E7 resolver with the literal rules above; `external|unresolved`
    accounting in output. 2–3 days.
 5. E9 `outline`. 1 day.
-6. Incremental re-extraction over `top` ranges inside a `--dsl` session
+6. Incremental re-extraction over `top` ranges inside a `--lmcode` session
    (optional; the cold path is already fast enough for CLI use).
 
 ## 6. Build / don't build

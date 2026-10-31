@@ -62,7 +62,7 @@ struct Finding {
 };
 
 // Every arena is append-only for one program run and cleared by reset()
-// before the next --dsl file (like the SDK's per-run reset of standard
+// before the next --lmcode file (like the SDK's per-run reset of standard
 // collection handles), so handles never dangle and the caps are per run, not
 // per process. Trees and NodeLists are few (65536); Node handles are many
 // (one per root()/child()/parent() call; NodeList.at() hands out pointers
@@ -91,7 +91,7 @@ struct Host {
   }
   std::vector<std::unique_ptr<lmok::NodeList>> node_lists;
   std::map<std::string, lmok::CompiledPattern> compiled_patterns; // "<grammar>\n<pattern>" -> compiled (ts.match_*)
-  // Findings collected via ts.report; reset per --dsl file (see the run loop).
+  // Findings collected via ts.report; reset per --lmcode file (see the run loop).
   std::vector<Finding> findings;
   bool include_metadata = false;
   bool no_suppress=false;
@@ -588,7 +588,7 @@ static int run_cli(int argc, char **argv) {
 #endif
   Host host;
   std::vector<char *> metadata_argv;
-  const bool metadata_verb=argc>=2&&(std::string(argv[1])=="lint"||std::string(argv[1])=="ci"||std::string(argv[1])=="check"||std::string(argv[1])=="--dsl");
+  const bool metadata_verb=argc>=2&&(std::string(argv[1])=="lint"||std::string(argv[1])=="ci"||std::string(argv[1])=="check"||std::string(argv[1])=="--lmcode");
   for(int i=0;i<argc;++i){if(metadata_verb&&i>=2&&std::string(argv[i])=="--metadata")host.include_metadata=true;else metadata_argv.push_back(argv[i]);}
   argc=static_cast<int>(metadata_argv.size());argv=metadata_argv.data();
   dslvm::Registry reg;
@@ -605,7 +605,7 @@ static int run_cli(int argc, char **argv) {
     return 0;
   };
   const std::string usage =
-      "usage: lmok --version | --notices | --dsl-schema [--json] | --dsl-signatures\n"
+      "usage: lmok --version | --notices | --lmcode-schema [--json] | --lmcode-signatures\n"
       "       lmok status [--db PATH] [--init]\n"
       "       lmok index [--db PATH] [--force] [DIR...]\n"
       "       lmok symbols [PATTERN] [--lang L] [--kind K] [--db PATH]\n"
@@ -621,7 +621,7 @@ static int run_cli(int argc, char **argv) {
       "       lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
       "       lmok metrics [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
       "       lmok dup [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--tokens N] FILE|DIR...\n"
-      "       lmok --dsl FILE [FILE ...]\n";
+      "       lmok --lmcode FILE [FILE ...]\n";
   if (argc>=2 && std::string(argv[1])=="rules") {
     if(argc<3){std::cerr<<"rules needs PACK...\n";return 2;}
     try {
@@ -979,7 +979,7 @@ static int run_cli(int argc, char **argv) {
                     static_cast<std::streamsize>(lmok::embedded_notices_size));
     return std::cout ? 0 : 4;
   }
-  if (argc >= 2 && std::string(argv[1]) == "--dsl-schema") {
+  if (argc >= 2 && std::string(argv[1]) == "--lmcode-schema") {
     if (argc == 2) {
       print_schema_summary(reg);
       return std::cout ? 0 : 4;
@@ -992,7 +992,7 @@ static int run_cli(int argc, char **argv) {
     std::cerr << usage;
     return 2;
   }
-  if (argc == 2 && std::string(argv[1]) == "--dsl-signatures") {
+  if (argc == 2 && std::string(argv[1]) == "--lmcode-signatures") {
     for (const auto &signature : reg.signatures()) std::cout << signature << "\n";
     return 0;
   }
@@ -1586,7 +1586,7 @@ static int run_cli(int argc, char **argv) {
     }
     return emit_result(); // SARIF/application validation completed; errors above never frame
   }
-  if (argc >= 3 && std::string(argv[1]) == "--dsl") {
+  if (argc >= 3 && std::string(argv[1]) == "--lmcode") {
     for (int i = 2; i < argc; ++i) {
       if (std::string(argv[i]).empty() || std::string(argv[i]).rfind("--", 0) == 0) {
         std::cerr << usage;

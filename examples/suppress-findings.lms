@@ -1,6 +1,6 @@
 # Chapter: Rules - host inline suppression
 # Shows: same-line selective lmok-disable in the host finding sink
-# Run: lmscript examples/suppress-findings.lms      (then: build/lmok --dsl build/suppress-findings.dslb)
+# Run: lmscript examples/suppress-findings.lms      (then: build/lmok --lmcode build/suppress-findings.dslb)
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the C source is embedded below.
 # exit: 0

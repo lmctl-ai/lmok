@@ -42,7 +42,7 @@ the same kind-indexed walk later.
 
 The `on` field value IS the `@ANNOTATION` value: a node kind. When v6
 bytecode carries a rule entry table (annotation + interface per rule), a
-`--dsl` chunk can export `implements Rule` fns indexed by kind; the
+`--lmcode` chunk can export `implements Rule` fns indexed by kind; the
 dispatcher then walks once and calls the exported fn for each hit instead of
 emitting a finding directly — the lmcode side supplies the action (report,
 suppress, SARIF, all already demonstrated script-side). Until then,

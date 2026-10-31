@@ -41,6 +41,7 @@ cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release >"$WORK/cmake.log
 cmake --build "$BUILD_DIR" -j2 >"$WORK/build.log" 2>&1 ||
   { grep -n -B 3 -A 4 "error:" "$WORK/build.log" >&2 || true; tail -30 "$WORK/build.log" >&2; fail "cmake build ($BUILD_DIR)"; }
 ok "host build ($BUILD_DIR)"
+python3 tests/check-host-flags.py schema/lmok.dsl.json "$HOST" || fail "hard host flag cutover"
 
 want_version="lmok $(sed -n 's/^project(lmok VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
 [ "$("$HOST" --version)" = "$want_version" ] || fail "--version prints $want_version"
@@ -52,14 +53,14 @@ ok "--version prints exactly '$want_version'"
 cmp THIRD_PARTY_NOTICES.md "$WORK/notices.txt" || fail "--notices differs from THIRD_PARTY_NOTICES.md"
 ok "--notices prints byte-identical THIRD_PARTY_NOTICES.md"
 
-"$HOST" --dsl-schema --json >"$WORK/embedded-schema.json" || fail "embedded schema print"
+"$HOST" --lmcode-schema --json >"$WORK/embedded-schema.json" || fail "embedded schema print"
 cmp schema/lmok.dsl.json "$WORK/embedded-schema.json" || fail "embedded schema differs from source bytes"
-ok "--dsl-schema --json prints byte-identical embedded schema bytes"
-"$HOST" --dsl-schema >"$WORK/schema-summary.txt" || fail "schema summary print"
+ok "--lmcode-schema --json prints byte-identical embedded schema bytes"
+"$HOST" --lmcode-schema >"$WORK/schema-summary.txt" || fail "schema summary print"
 python3 - "$WORK/schema-summary.txt" <<'PY'
 import re,subprocess,sys
 summary=open(sys.argv[1]).read()
-sigs=subprocess.run(['build/lmok','--dsl-signatures'],capture_output=True,text=True).stdout.splitlines()
+sigs=subprocess.run(['build/lmok','--lmcode-signatures'],capture_output=True,text=True).stdout.splitlines()
 missing=[]
 for line in sigs:
   if line.startswith('method '): needle=line[7:]
@@ -68,16 +69,16 @@ for line in sigs:
   else: needle=line
   if needle not in summary: missing.append(needle)
 assert not missing, missing
-print('all', len(sigs), 'registry members listed in --dsl-schema summary')
+print('all', len(sigs), 'registry members listed in --lmcode-schema summary')
 PY
-ok "--dsl-schema summary lists every registry member"
-diff -u <("$LMSCRIPT" --dsl-signatures schema/lmok.dsl.json) <("$HOST" --dsl-signatures) || fail "host/compiler signatures differ"
+ok "--lmcode-schema summary lists every registry member"
+diff -u <("$LMSCRIPT" --lmcode-signatures schema/lmok.dsl.json) <("$HOST" --lmcode-signatures) || fail "host/compiler signatures differ"
 python3 scripts/merge-std.py schema/lmok.host.json "$WORK/merged-schema.json"
 cmp schema/lmok.dsl.json "$WORK/merged-schema.json" || fail "generated schema differs from pinned host/std merge"
 python3 scripts/merge-std.py --host-only schema/lmok.dsl.json "$WORK/host-only-schema.json"
 cmp schema/lmok.host.json "$WORK/host-only-schema.json" || fail "host-only input contains standard members"
-"$HOST" --dsl-signatures >"$WORK/registry-signatures.txt"
-"$LMSCRIPT" --dsl-signatures cpp/std/lmcode-std.schema.json >"$WORK/standard-signatures.txt"
+"$HOST" --lmcode-signatures >"$WORK/registry-signatures.txt"
+"$LMSCRIPT" --lmcode-signatures cpp/std/lmcode-std.schema.json >"$WORK/standard-signatures.txt"
 python3 - "$WORK" <<'PYHOST'
 from pathlib import Path
 import sys
@@ -87,7 +88,7 @@ standard=set((work/'standard-signatures.txt').read_text().splitlines())
 assert len(standard)==206, len(standard)  # canonical v3 catalog including all 24 return overloads
 (work/'host-signatures.txt').write_bytes(''.join(line+'\n' for line in sorted(registry-standard)).encode('utf-8'))
 PYHOST
-diff -u <("$LMSCRIPT" --dsl-signatures schema/lmok.host.json --without-std) "$WORK/host-signatures.txt" || fail "host-only registry/compiler signatures differ"
+diff -u <("$LMSCRIPT" --lmcode-signatures schema/lmok.host.json --without-std) "$WORK/host-signatures.txt" || fail "host-only registry/compiler signatures differ"
 ok "typed registry signatures match explicit canonical merge and host-only schema"
 python3 tests/check-returns.py "$HOST" || fail "invocation return protocol"
 ok "body/entry result ownership, terminal frames and failure silence"
@@ -350,7 +351,7 @@ savedsl(p, "$WORK/smoke.dslb");
 EOF
 "$LMSCRIPT" "$WORK/smoke.lms" "$WORK/smoke.dslb" >/dev/null || fail "smoke compile"
 [ "$(od -An -t u1 -j 5 -N 1 "$WORK/smoke.dslb" | tr -d ' ')" = 6 ] || fail "smoke was not compiled as bytecode v6"
-out="$("$HOST" --dsl "$WORK/smoke.dslb")"
+out="$("$HOST" --lmcode "$WORK/smoke.dslb")"
 [ "$(tail -1 <<<"$out")" = 'LMCODE_RETURN_END' ] || fail "smoke run: $out"
 grep -qxF '{"ok": true, "result": null}' <<<"$out" || fail "smoke run protocol: $out"
 grep -qxF '(document (object (pair key: (string (string_content)) value: (string (string_content))) (pair key: (string (string_content)) value: (array (string (string_content)) (string (string_content))))))' <<<"$out" || fail "smoke sexp line: $out"
@@ -367,7 +368,7 @@ end _dsl_
 savedsl(p, "$WORK/error-tree.dslb");
 EOF
 "$LMSCRIPT" "$WORK/error-tree.lms" "$WORK/error-tree.dslb" >/dev/null || fail "error-tree compile"
-out="$("$HOST" --dsl "$WORK/error-tree.dslb")"
+out="$("$HOST" --lmcode "$WORK/error-tree.dslb")"
 grep -q '^error flagged$' <<<"$out" || fail "malformed JSON must set has_error: $out"
 ok "bytecode: malformed JSON flags Tree.has_error"
 
@@ -389,7 +390,7 @@ end _dsl_
 savedsl(p, "$WORK/oob.dslb");
 EOF
 "$LMSCRIPT" "$WORK/oob.lms" "$WORK/oob.dslb" >/dev/null || fail "compile"
-set +e; out="$("$HOST" --dsl "$WORK/oob.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/oob.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'out of range'* ]] || fail "StrList.at bounds (exit $code): $out"
 ok "StrList.at bounds refused at runtime (exit 3)"
 
@@ -401,7 +402,7 @@ end _lmcode_
 savedsl(p, "$WORK/bad-pattern.dslb");
 EOF
 "$LMSCRIPT" "$WORK/bad-pattern.lms" "$WORK/bad-pattern.dslb" >/dev/null || fail "bad-pattern compile"
-set +e; out="$("$HOST" --dsl "$WORK/bad-pattern.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/bad-pattern.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *"pattern 'strcpy(\$A' does not parse as c"* ]] || fail "ts.match_c bad pattern (exit $code): $out"
 ok "bytecode: ts.match_c with an unparseable pattern is a runtime error naming the fragment (exit 3)"
 
@@ -414,18 +415,18 @@ end _dsl_
 savedsl(p, "$WORK/root-parent.dslb");
 EOF
 "$LMSCRIPT" "$WORK/root-parent.lms" "$WORK/root-parent.dslb" >/dev/null || fail "root-parent compile"
-set +e; out="$("$HOST" --dsl "$WORK/root-parent.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/root-parent.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'root node has no parent'* ]] || fail "Node.parent on root (exit $code): $out"
 ok "Node.parent: has_parent() false at root, parent() on root refused (exit 3)"
 
 set +e; out="$("$HOST" 2>&1)"; code=$?; set -e
 [ "$code" = 2 ] && [[ "$out" == *'usage: lmok'* ]] || fail "bad args refusal (exit $code): $out"
 ok "bad arguments refused (exit 2)"
-set +e; out="$("$HOST" --dsl "$WORK/no-such.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/no-such.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'"phase": "load"'* ]] || fail "missing bytecode refusal (exit $code): $out"
 ok "missing bytecode file refused at load (exit 3)"
 
-"$HOST" --dsl "$WORK/smoke.dslb" "$WORK/error-tree.dslb" >"$WORK/multi.jsonl" || fail "multi-bytecode run"
+"$HOST" --lmcode "$WORK/smoke.dslb" "$WORK/error-tree.dslb" >"$WORK/multi.jsonl" || fail "multi-bytecode run"
 [ "$(grep -c '^{"ok": true, "result": null}$' "$WORK/multi.jsonl")" = 2 ] || fail "multiple bytecode files did not run in order"
 ok "multiple bytecode files run sequentially"
 
@@ -433,7 +434,7 @@ ok "multiple bytecode files run sequentially"
 mkdir -p build
 for f in parse-string parse-file detect-error cst-rules lint-json report-json query-json lint-c rule-catalog suppress-findings sarif-report incremental-reparse pattern-rules autofix-report; do
   "$LMSCRIPT" "examples/$f.lms" "build/$f.dslb" >"$WORK/$f.compile.log" 2>&1 || fail "$f example compile"
-  "$HOST" --dsl "build/$f.dslb" >"$WORK/$f.out" || fail "$f example run"
+  "$HOST" --lmcode "build/$f.dslb" >"$WORK/$f.out" || fail "$f example run"
   # every '# expect:' line must appear in the program output
   while IFS= read -r line; do
     grep -qxF "${line:2}" "$WORK/$f.out" || fail "$f example output missing: ${line:2} (got $(cat "$WORK/$f.out"))"
@@ -497,7 +498,7 @@ done < <(grep '^#|' examples/lint-tsx.lms)
 ok "lint-tsx: lmscript drives the TSX tier-1 pack"
 
 # Entry rules declare their language/input in a non-executable test header.
-# Aggregate scripts without that header retain the body-only --dsl path.
+# Aggregate scripts without that header retain the body-only --lmcode path.
 run_rule() {
   local rule_source="$1" rule_bytecode="$2" rule_spec rule_lang rule_input
   rule_spec="$(sed -n 's/^# check: //p' "$rule_source")"
@@ -505,7 +506,7 @@ run_rule() {
     read -r rule_lang rule_input <<< "$rule_spec"
     "$HOST" check --lang "$rule_lang" "$rule_bytecode" "$rule_input"
   else
-    "$HOST" --dsl "$rule_bytecode"
+    "$HOST" --lmcode "$rule_bytecode"
   fi
 }
 
@@ -541,7 +542,7 @@ end _dsl_
 savedsl(p, "$WORK/reparse-contract.dslb");
 EOF2
 "$LMSCRIPT" "$WORK/reparse-contract.lms" "$WORK/reparse-contract.dslb" >/dev/null || fail "reparse-contract compile"
-out="$("$HOST" --dsl "$WORK/reparse-contract.dslb")"
+out="$("$HOST" --lmcode "$WORK/reparse-contract.dslb")"
 grep -q '^ranges \[\[1,2\]\]$' <<<"$out" || fail "changed_ranges: $out"
 grep -q '^old root kind document$' <<<"$out" || fail "old tree alive after reparse: $out"
 ok "reparse: old tree stays alive (changed_ranges + root kind readable)"
@@ -554,7 +555,7 @@ end _dsl_
 savedsl(p, "$WORK/bad-edit.dslb");
 EOF2
 "$LMSCRIPT" "$WORK/bad-edit.lms" "$WORK/bad-edit.dslb" >/dev/null || fail "bad-edit compile"
-set +e; out="$("$HOST" --dsl "$WORK/bad-edit.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/bad-edit.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'bad byte offsets'* ]] || fail "edit out of range (exit $code): $out"
 ok "Tree.edit: out-of-range offsets refused (exit 3)"
 
@@ -583,7 +584,7 @@ end _dsl_
 savedsl(p, "$WORK/reparse-noedit.dslb");
 EOF2
 "$LMSCRIPT" "$WORK/reparse-noedit.lms" "$WORK/reparse-noedit.dslb" >/dev/null || fail "reparse-noedit compile"
-set +e; out="$("$HOST" --dsl "$WORK/reparse-noedit.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/reparse-noedit.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'no pending edit for changed text'* ]] && grep -q '^same (document (object))$' <<<"$out" \
   || fail "reparse without edit (exit $code): $out"
 cat > "$WORK/reparse-badlen.lms" <<EOF2
@@ -595,7 +596,7 @@ end _dsl_
 savedsl(p, "$WORK/reparse-badlen.dslb");
 EOF2
 "$LMSCRIPT" "$WORK/reparse-badlen.lms" "$WORK/reparse-badlen.dslb" >/dev/null || fail "reparse-badlen compile"
-set +e; out="$("$HOST" --dsl "$WORK/reparse-badlen.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/reparse-badlen.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [[ "$out" == *'new text is 8 bytes but the pending edit implies 57'* ]] || fail "reparse inconsistent edit (exit $code): $out"
 ok "reparse contract: identical text ok, changed text without edit refused, edit/text length mismatch refused (exit 3)"
 
@@ -618,11 +619,11 @@ end _dsl_
 savedsl(p, "$WORK/bigwalk.dslb");
 EOF2
 "$LMSCRIPT" "$WORK/bigwalk.lms" "$WORK/bigwalk.dslb" >/dev/null || fail "bigwalk compile"
-out="$("$HOST" --dsl "$WORK/bigwalk.dslb")" || fail "bigwalk run: $out"
+out="$("$HOST" --lmcode "$WORK/bigwalk.dslb")" || fail "bigwalk run: $out"
 grep -q '^named 180003 identifiers 50000$' <<<"$out" || fail "bigwalk output: $out"
 ok "NodeList iteration over a 180k-node C tree runs in one program (no per-visit Node handles)"
 
-# M3: arenas reset per --dsl file: 3 runs x 400k root() handles would exceed
+# M3: arenas reset per --lmcode file: 3 runs x 400k root() handles would exceed
 # the 1<<20 Node cap if the arena carried over; findings reset too.
 cat > "$WORK/handles.lms" <<EOF2
 p = _dsl_ cli="lmok" install="github:lmctl-ai/lmok@latest";
@@ -635,9 +636,9 @@ end _dsl_
 savedsl(p, "$WORK/handles.dslb");
 EOF2
 "$LMSCRIPT" "$WORK/handles.lms" "$WORK/handles.dslb" >/dev/null || fail "handles compile"
-out="$("$HOST" --dsl "$WORK/handles.dslb" "$WORK/handles.dslb" "$WORK/handles.dslb")" || fail "handles x3 run: $out"
+out="$("$HOST" --lmcode "$WORK/handles.dslb" "$WORK/handles.dslb" "$WORK/handles.dslb")" || fail "handles x3 run: $out"
 [ "$(grep -c '^findings 1$' <<<"$out")" = 3 ] && [ "$(grep -c '^LMCODE_RETURN_END$' <<<"$out")" = 3 ] || fail "handles x3 output: $out"
-ok "--dsl arenas (trees/nodes/lists/findings) reset per program: 3 x 400k handles run, findings restart at 1"
+ok "--lmcode arenas (trees/nodes/lists/findings) reset per program: 3 x 400k handles run, findings restart at 1"
 
 # M4: an iterator error during directory expansion fails fast (exit 3), never a silent partial list.
 if [ "$(id -u 2>/dev/null || echo 0)" != 0 ] && [[ "$UNAME_S" != MINGW* && "$UNAME_S" != MSYS* && "$UNAME_S" != CYGWIN* ]]; then
@@ -919,7 +920,7 @@ end _dsl_
 savedsl(p, "$WORK/child-index.dslb");
 EOF_CHILD
 "$LMSCRIPT" "$WORK/child-index.lms" "$WORK/child-index.dslb" >/dev/null || fail "child-index compile"
-set +e; out="$("$HOST" --dsl "$WORK/child-index.dslb" 2>&1)"; code=$?; set -e
+set +e; out="$("$HOST" --lmcode "$WORK/child-index.dslb" 2>&1)"; code=$?; set -e
 [ "$code" = 3 ] && [ "$out" = '{"ok": false, "phase": "run", "code": "RUN_HOST", "message": "dsl line 3:3: Node.child index '"$index"' out of range (named child count 1)", "line": 3, "column": 3}' ] || fail "child-index (exit $code): $out"
 done
 ok "robustness: negative, uint32 overflow and int64-max Node.child indices (exact bytes)"
@@ -931,7 +932,7 @@ for data, message in [(b'', "not a DSL bytecode file: bad magic (expected 'DSLB'
                       (b'XSLB\x00\x05', "not a DSL bytecode file: bad magic (expected 'DSLB')"),
                       (b'DSLB', 'bytecode is truncated: wanted 2 byte(s) at offset 4, file has 4')]:
     p.write_bytes(data)
-    r = subprocess.run([host,'--dsl',str(p)],capture_output=True,timeout=5)
+    r = subprocess.run([host,'--lmcode',str(p)],capture_output=True,timeout=5)
     expected = '{"ok": false, "phase": "load", "code": "LOAD_BAD_BYTECODE", "message": "'+message+'"}\n'
     assert (r.returncode,r.stdout,r.stderr) == (3,expected.encode(),b''), r
 PY
@@ -1228,7 +1229,7 @@ ok "rule metadata and annotated pack harness"
 "$HOST" test rules/python-tier1.json tests/fixtures/python-tier1-annotated.py || fail "annotated Python pack"
 "$HOST" test examples/self-test/pack.json examples/self-test/fixture.c || fail "self-test example"
 "$LMSCRIPT" examples/report-metadata.lms >"$WORK/report-metadata.compile" || fail "metadata example compile"
-"$HOST" --dsl build/report-metadata.dslb --metadata >"$WORK/report-metadata.json" || fail "metadata example run"
+"$HOST" --lmcode build/report-metadata.dslb --metadata >"$WORK/report-metadata.json" || fail "metadata example run"
 python3 - "$WORK/report-metadata.json" <<'PYMETA'
 import json, sys
 finding=json.loads(open(sys.argv[1],encoding='utf8').readline())[0]

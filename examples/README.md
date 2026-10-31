@@ -7,7 +7,7 @@ Use `lmscript` >= 0.2.444 with the matching host on PATH:
 export PATH="$PWD/build:$PATH"
 mkdir -p build
 lmscript examples/parse-string.lms
-build/lmok --dsl build/parse-string.dslb
+build/lmok --lmcode build/parse-string.dslb
 ```
 
 The outer script's `savedsl` call chooses the output filename. A second
@@ -15,7 +15,7 @@ positional argument to `lmscript` is a script argument, not an output-path
 option. Compilation is normally silent. Execution prints the JSON text,
 its tree, `has_error -> false`, `nodes -> 34`, and the host success record
 `{"ok": true, "result": null}`. Each script's `# expect:` / `#|` comments
-list its expected program output; `--dsl` adds the success record.
+list its expected program output; `--lmcode` adds the success record.
 
 The `install="github:lmctl-ai/lmok@latest"` declaration can resolve a
 published host when one is not on PATH, once maintainers publish renamed
@@ -31,7 +31,7 @@ for source in examples/*.lms; do
   lmscript "$source" || exit 1
   case "$source" in
     examples/lint-repo.lms|examples/lint-go.lms|examples/lint-javascript.lms|examples/lint-typescript.lms|examples/lint-tsx.lms) ;; # drives the CLI directly
-    *) build/lmok --dsl "build/$(basename "$source" .lms).dslb" || exit 1 ;;
+    *) build/lmok --lmcode "build/$(basename "$source" .lms).dslb" || exit 1 ;;
   esac
 done
 ```
@@ -117,7 +117,7 @@ idiom that replaces it for whole-tree scans; `report-json.lms` shows the
 `lint-json.lms`; `query-json.lms` shows S-expression selectors replacing
 structural navigation. Rule annotations (`@PAIR`, `@STRING`, `@NUMBER`) are
 v6 entry dispatch keys when the compiled file is run through `lmok check`.
-The ordinary `--dsl` examples remain body-driven and keep their explicit loops.
+The ordinary `--lmcode` examples remain body-driven and keep their explicit loops.
 Node rows/columns are 0-based (tree-sitter convention); `ts.report` findings
 carry row/col/end_row/end_col plus the message, and the 4-arg overload adds
 free-form `rule`/`severity` strings (emitted by `report_json` only when
@@ -137,7 +137,7 @@ lmok check --lang c build/c-function-metrics.dslb examples/data/sample.c
 ```
 
 The command parses each named input once and resets transient trees/findings
-between inputs. Cross-file aggregation remains a body-level `--dsl` concern.
+between inputs. Cross-file aggregation remains a body-level `--lmcode` concern.
 
 `bash examples/secrets.sh` demonstrates opting in to the JSON and Python secret
 packs. Findings expose four content bytes plus `[REDACTED]`; examples read only

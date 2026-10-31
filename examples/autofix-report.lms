@@ -1,6 +1,6 @@
 # Chapter: Rules - report a token-safe replacement from an lmcode entry
 # Shows: ts.report_fix with a literal replacement and structured finding output
-# Run: lmscript examples/autofix-report.lms (then: build/lmok --dsl build/autofix-report.dslb)
+# Run: lmscript examples/autofix-report.lms (then: build/lmok --lmcode build/autofix-report.dslb)
 # Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
 # Data: the C source is embedded below.
 # expect:
