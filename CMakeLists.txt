@@ -125,6 +125,7 @@ add_executable(lmok
   cpp/lint.cpp
   cpp/pattern.cpp
   cpp/db.cpp
+  cpp/search.cpp
   cpp/baseline.cpp
   cpp/sarif.cpp
   $<TARGET_OBJECTS:lmok_sqlite>

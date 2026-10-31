@@ -1317,4 +1317,10 @@ ok "Ts DB missing/corrupt errors are located exit 3; script --db validation and 
 python3 tests/check-db-lmcode.py "$HOST" "$WORK" rule || fail "DB lmcode rule"
 ok "LBC111 byte-exact indexed C findings, cross-file resolution and language controls"
 
+# --- Stored-text search: literals, native FTS5, bounded output and legacy DBs ---
+for find_case in literal fts limit fallback errors; do
+  python3 tests/check-find.py "$HOST" "$find_case" || fail "find $find_case"
+  ok "find: $find_case"
+done
+
 echo "PASS: $pass checks"

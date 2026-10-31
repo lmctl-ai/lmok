@@ -92,7 +92,7 @@ CREATE INDEX idx_findings_rule ON findings(rule, superseded);
 
 -- the search half: full text mirror of every indexed file
 CREATE VIRTUAL TABLE file_text USING fts5(
-  path UNINDEXED, lang UNINDEXED, text
+  path UNINDEXED, lang UNINDEXED, text, byte_scan UNINDEXED, tokenize='trigram'
 );
 )LMOKSQL";
 

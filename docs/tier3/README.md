@@ -1,11 +1,13 @@
 # Tier 3 synthesis: knowledge tree + local DB (Lead's consolidation)
 
 Status (2026-10-31): the storage spike is shipped. `facts`, `index`, `symbols`,
-`refs`, `findings`, `status`, `outline` and `lint --db` work on current main; facts/parser
-coverage is 11 languages. The `ts.db_files`, `ts.db_symbols` and `ts.db_refs`
-lmcode methods are shipped, with `--lmcode FILE --db PATH` support and
+`refs`, `find`, `findings`, `status`, `outline` and `lint --db` work on current main;
+facts/parser coverage is 11 languages. `find` ships literal/FTS5 trigram search
+with exact verification and reported fallback scans. The `ts.db_files`,
+`ts.db_symbols` and `ts.db_refs` lmcode methods are shipped, with
+`--lmcode FILE --db PATH` support and
 [LBC111](../../rules/README.md#indexed-c-calls-lbc111) as the repository-wide C example.
-`find` and trigram search remain proposals. See the [verified journey](../user-journey-review.md).
+See the [verified journey](../user-journey-review.md).
 The rest of this document records the original architecture and phasing. Inputs:
 `deep-analysis.md` (Fable), `local-index-survey.md` (Astra1), `db-design.md`
 (Kimi2). Owner framing: NOT SonarQube parity; half exact knowledge tree, half
@@ -113,3 +115,7 @@ line budget. No daemon or DB is required.
 [Scale validation](scale-validation.md) records cold/warm/1% indexing, query
 latency, resource stress, and a subsecond timestamp invalidation fix. Cold curl
 indexing exceeded 10 seconds; the mixed corpus exceeded the DB-size target.
+
+**Search landed:** see [find semantics and examples](../../README.md#search-indexed-text-find).
+Search reads stored snapshots; regex and automatic live-workspace reconciliation
+remain proposals. Old word-token indexes upgrade transactionally on `index`.

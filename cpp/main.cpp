@@ -14,6 +14,7 @@
 #include "metrics.hpp"
 #include "input.hpp"
 #include "db.hpp"
+#include "search.hpp"
 #include "baseline.hpp"
 #include "sarif.hpp"
 #include "dslvm.hpp"
@@ -651,6 +652,7 @@ static int run_cli(int argc, char **argv) {
       "       lmok index [--db PATH] [--force] [DIR...]\n"
       "       lmok symbols [PATTERN] [--lang L] [--kind K] [--db PATH]\n"
       "       lmok refs NAME [--db PATH]\n"
+      "       lmok find PATTERN [--fts] [--lang L] [--db PATH] [--limit N]\n"
       "       lmok findings [--rule ID] [--file PATH] [--db PATH]\n"
       "       lmok parse [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE\n"
       "       lmok query [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--pattern] PATTERN FILE\n"
@@ -782,6 +784,7 @@ static int run_cli(int argc, char **argv) {
     try {
       const auto resolved = lmok::resolve_db_path(db_path, true);
       lmok::Database db(resolved, lmok::Database::Mode::Create);
+      lmok::ensure_trigram_index(db);
       // `extracted` distinguishes a row written by `index` (facts + file_text
       // present) from one `lint --db` created only so findings have a file_id:
       // the latter has the real hash/stat but NO extraction, so "unchanged"
@@ -883,8 +886,9 @@ static int run_cli(int argc, char **argv) {
               }
             }
           }
-          auto ins_text = db.prepare("INSERT INTO file_text(path, lang, text) VALUES (?,?,?)");
-          ins_text.bind(1, path); ins_text.bind(2, lang); ins_text.bind(3, raw); ins_text.step();
+          auto ins_text = db.prepare("INSERT INTO file_text(path, lang, text, byte_scan) VALUES (?,?,?,?)");
+          ins_text.bind(1, path); ins_text.bind(2, lang); ins_text.bind(3, raw);
+          ins_text.bind(4, static_cast<int64_t>(lmok::search_needs_byte_scan(raw))); ins_text.step();
           transaction.commit();
         }
         ++n_indexed;
@@ -962,6 +966,43 @@ static int run_cli(int argc, char **argv) {
     } catch (const std::exception &error) {
       std::cerr << "index: " << error.what() << "\n";
       return 3;
+    }
+  }
+  if (argc >= 2 && std::string(argv[1]) == "find") {
+    lmok::FindOptions options;
+    std::optional<std::string> db_path, pattern;
+    bool positional = false, limit_set = false;
+    for (int i = 2; i < argc; ++i) {
+      const std::string arg = argv[i];
+      if (!positional && arg == "--") { positional = true; continue; }
+      if (!positional && arg == "--fts" && !options.fts) { options.fts = true; continue; }
+      if (!positional && (arg == "--db" || arg == "--lang" || arg == "--limit")) {
+        if (++i == argc) { std::cerr << arg << " needs a value\n"; return 2; }
+        const std::string value = argv[i];
+        if (arg == "--db" && !db_path) db_path = value;
+        else if (arg == "--lang" && !options.lang) {
+          lmok::Grammar grammar;
+          if (!parse_lang(value, grammar)) { std::cerr << "unknown language '" << value << "'\n"; return 2; }
+          options.lang = value;
+        } else if (arg == "--limit" && !limit_set) {
+          const auto parsed = std::from_chars(value.data(), value.data() + value.size(), options.limit);
+          if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || options.limit == 0) {
+            std::cerr << "--limit needs a positive integer\n"; return 2;
+          }
+          limit_set = true;
+        } else { std::cerr << usage; return 2; }
+      } else if ((!positional && arg.rfind("--", 0) == 0) || pattern) { std::cerr << usage; return 2; }
+      else pattern = arg;
+    }
+    if (!pattern || pattern->empty()) { std::cerr << "find needs a nonempty pattern\n"; return 2; }
+    options.pattern = *pattern;
+    try {
+      lmok::Database db(lmok::resolve_db_path(db_path, false));
+      return lmok::find_text(db, options, std::cout, std::cerr);
+    } catch (const lmok::DbError &error) {
+      std::cerr << error.what() << "\n"; return error.exit_code;
+    } catch (const std::exception &error) {
+      std::cerr << "find: " << error.what() << "\n"; return 3;
     }
   }
   // Read verbs over the facts DB. Output shape mirrors `query`:

@@ -156,6 +156,7 @@ instead of a public bytecode-export command.
 | `index` | Persist file facts; skip unchanged files. | `build/lmok index tests/fixtures/db/index --db build/journey/index.db` |
 | `symbols` | Query stored symbols by SQL LIKE name pattern. | `build/lmok symbols '%' --lang c --db build/journey/index.db` |
 | `refs` | Query stored references by exact spelling. | `build/lmok refs helper --db build/journey/index.db` |
+| `find` | Search indexed text, with literal or explicit FTS5 queries. | `build/lmok find helper --db build/journey/index.db` |
 | `findings` | Read live stored findings (empty before recording lint). | `build/lmok findings --db build/journey/index.db` |
 | `status` | Print DB location, counts and last run. | `build/lmok status --db build/journey/index.db` |
 | `check` | Dispatch compiled entry rules over source inputs. | `build/lmok check --lang c build/journey/metrics.dslb tests/fixtures/c-logic-violations.c` |
@@ -168,8 +169,8 @@ instead of a public bytecode-export command.
 | `--lmcode-schema` | Inspect the host/standard schema. | `build/lmok --lmcode-schema --json` |
 | `--lmcode-signatures` | List registered signatures. | `build/lmok --lmcode-signatures` |
 
-Run the DB rows in table order. `find` remains a design proposal. `outline`
-is available on current main; the checked v0.6.11/dist snapshots predate it. `--lang` accepts `json`, `c`, `python`, `bash`, `java`,
+Run the DB rows in table order. `find` and `outline` are available on current
+main; the checked v0.6.11/dist snapshots predate them. `--lang` accepts `json`, `c`, `python`, `bash`, `java`,
 `go`, `javascript`, `typescript`, `tsx`, `lmscript`, or `lmcode` for the
 source-analysis verbs. `index` infers languages from extensions.
 
@@ -262,6 +263,57 @@ Explicit `status --init` creates the empty schema and prints status.
 It preserves a compatible existing DB and never overwrites an incompatible
 one. This is a bootstrap/diagnostic operation, not an indexing operation.
 
+## Search indexed text (`find`)
+
+```sh
+mkdir -p build/journey
+build/lmok index tests/fixtures/db/index --db build/journey/index.db
+build/lmok find helper --db build/journey/index.db
+build/lmok find 'helper(' --lang c --limit 10 --db build/journey/index.db
+build/lmok find 'helper OR add' --fts --db build/journey/index.db
+```
+
+`find PATTERN [--fts] [--lang L] [--db PATH] [--limit N]` searches the **stored
+index snapshot**, not live files. Run `index` to refresh edits/deletions.
+Output is `path:row:col: line-text`, sorted by path, row, then column. Rows and
+UTF-8 **byte** columns are zero-based, like `refs`. Every occurrence gets a
+line, including repeated/overlapping hits on the same source line. A match
+spanning newlines reports its starting line; LF and a preceding CR are omitted
+from the displayed line text. No-match searches exit 0.
+
+By default PATTERN is a **case-sensitive literal substring**. Internally it is
+wrapped in an FTS5 double-quoted phrase, with every embedded `"` doubled;
+trigram MATCH narrows candidate files, then original stored bytes are checked
+exactly. Thus `foo(`, `"quoted"`, spaces, and `OR` are literal data, not syntax.
+Use `--` before a pattern starting with `--`.
+
+`--fts` instead passes PATTERN unchanged as an [FTS5 query](https://www.sqlite.org/fts5.html#full_text_query_syntax):
+quoted phrases, AND/OR/NOT, NEAR and prefixes follow SQLite's tokenizer/query
+semantics. Trigram MATCH is case-insensitive by default and terms shorter than
+three Unicode characters do not match. Syntax errors exit 2. Output positions
+are the distinct starts of positive phrase occurrences in matched documents;
+FTS token offsets are mapped back to stored source bytes through the FTS5
+extension API (FTS5 does not provide the older `offsets()` function).
+
+Literal patterns shorter than three Unicode characters or containing invalid
+UTF-8 use a direct stored-text scan, announced on stderr. Stored files
+containing NUL or malformed UTF-8 are classified at index time
+and included through a reported byte-scan fallback, even when other files use
+trigram narrowing. NULL/missing classification is treated conservatively.
+Legacy word-token DBs also scan for literals, so substrings are never silently
+missed; `--fts`
+uses their existing word-token semantics with a notice. Explicit `--fts`
+always follows native tokenizer semantics, including its limitations on
+NUL/malformed text; use literal mode for byte-exact searching. Run `index` once to
+upgrade the old text index, preserving existing rows transactionally. A scan
+may cost O(stored bytes); the limit bounds output, not search work. Regex is
+not supported by this verb.
+
+The default cap is **1000 occurrences**. `--limit N` accepts a positive integer;
+a `find: truncated after N hits (use --limit N)` stderr note appears only when
+another hit exists. Missing DBs exit 2 with "run `lmok index` first" and are
+not created. DB/read failures exit 3; stdout failures exit 4.
+
 ## Recording lint runs (`lint --db`, `findings`)
 
 ```sh
@@ -305,8 +357,9 @@ The tool never edits `.gitignore`.
 SQLite 3.54.1 is compiled into the binary; no system SQLite or SQLite CLI is
 needed. Writers enable WAL with a five-second busy timeout and foreign-key
 checks. Readers see one transaction snapshot. The [schema](docs/tier3/db-design.md#2-db-schema-sqlite--fts5)
-is embedded verbatim, including its FTS5 default tokenizer; trigram search
-is future work. Schema-version mismatches exit 2 with delete/re-index guidance;
+is embedded verbatim. New text indexes use FTS5 trigram tokenization; `index`
+transactionally upgrades older word-token text indexes without changing their
+facts, findings or schema version. Schema-version mismatches exit 2 with delete/re-index guidance;
 unreadable/corrupt DBs exit 3, and stdout failures exit 4.
 
 ## New-code-only linting (`--new-since`, `--baseline`, `--changed`, `--fail-on-new`)

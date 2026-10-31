@@ -1,7 +1,8 @@
 # Tier 3: local DB + knowledge tree (design sketch)
 
-Status: design only, no implementation. Target reader: whoever codes the
-v0.6.0 spike. Ground rules from the owner: **local-first, CLI-first, single
+Status: the storage/read verbs and literal/FTS5 `find` are implemented;
+remaining proposals are identified in the [synthesis](README.md). This document
+also records the original v0.6.0 spike design. Ground rules from the owner: **local-first, CLI-first, single
 static binary, no server/platform/daemon**. Tier 1 (packs) and tier 2
 (mechanical extensions) are done; tier 3 is re-scoped from "real semantics"
 (types/CFG/dataflow — still deferred) to something tree-sitter CAN do exactly:
@@ -21,7 +22,7 @@ New/changed verbs (existing `parse`/`query`/`lint`/`--lmcode` behavior unchanged
 lmok index [DIR...] [--db PATH] [--force]
 lmok symbols [PATTERN] [--lang L] [--kind K] [--db PATH]
 lmok refs NAME [--db PATH]
-lmok find PATTERN [--lang L] [--db PATH]        # the search half (FTS5)
+lmok find PATTERN [--fts] [--lang L] [--db PATH] [--limit N]        # the search half (FTS5)
 lmok findings [--rule ID] [--file PATH] [--db PATH]
 lmok status [--db PATH]
 lmok lint RULES.json FILE... [--db PATH]        # also writes findings
@@ -37,7 +38,12 @@ lmok lint RULES.json FILE... [--db PATH]        # also writes findings
   default `%`.
 - `refs NAME` prints reference sites in the same shape.
 - `find PATTERN` runs FTS5 over stored file text, prints
-  `path:row:col: line-text` (grep-shaped, sorted by path then row).
+  `path:row:col: line-text` (zero-based rows/byte columns, sorted by path, row,
+  column). Default input is a quoted literal, exactly verified after trigram
+  candidate selection; `--fts` opts into raw FTS5 syntax. Short/invalid-UTF-8
+  literals and legacy word-token indexes scan with an stderr notice. Default
+  limit: 1000 occurrences, with an explicit truncation notice. See the
+  [complete query contract](../../README.md#search-indexed-text-find).
 - `findings` prints stored findings as the same JSON lines lint prints
   (row, col, end_row, end_col, rule, severity, message + `"path"` field —
   the one deliberate format extension, since findings outlive a single run).
@@ -67,6 +73,14 @@ minor versions in the spike (schema_version in `meta`, mismatch = exit 2
 telling the user to re-index).
 
 ## 2. DB schema (SQLite + FTS5)
+
+New schema-2 databases use `tokenize='trigram'` below. `index` atomically
+rebuilds older word-token `file_text` tables from their stored text, preserving
+rowids and leaving facts/findings unchanged. The unindexed `byte_scan` field
+marks NUL/malformed UTF-8 text that literal searches must scan directly; NULL
+is conservatively scanned too. Older trigram tables without this field also
+upgrade on `index`. Read verbs never migrate a DB.
+
 
 SQLite amalgamation vendored via `deps.lock` like the tree-sitter pins,
 compiled with `-DSQLITE_ENABLE_FTS5 -DSQLITE_THREADSAFE=1`, linked into the
@@ -156,7 +170,7 @@ CREATE INDEX idx_findings_rule ON findings(rule, superseded);
 
 -- the search half: full text mirror of every indexed file
 CREATE VIRTUAL TABLE file_text USING fts5(
-  path UNINDEXED, lang UNINDEXED, text
+  path UNINDEXED, lang UNINDEXED, text, byte_scan UNINDEXED, tokenize='trigram'
 );
 ```
 
