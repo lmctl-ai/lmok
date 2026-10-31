@@ -123,6 +123,7 @@ struct Host {
   bool include_metadata = false;
   bool no_suppress=false;
   std::map<const lmok::Tree *, lmok::Suppression> suppressions;
+  std::map<const lmok::Tree *, const lmok::Tree *> suppression_owners;
   size_t suppressed_count() const {size_t n=0;for(const auto &s:suppressions)n+=s.second.suppressed;return n;}
   void suppression_warnings(const std::string &path) {for(auto &s:suppressions)s.second.warn(path,{},true);}
   template <class T>
@@ -149,6 +150,7 @@ struct Host {
     node_lists.clear();
     findings.clear();
     suppressions.clear();
+    suppression_owners.clear();
   }
 };
 
@@ -324,7 +326,9 @@ void register_host(dslvm::Registry &reg, Host &host) {
       if (with_fix) f.fix = lmok::FixEdit{lmok::node_start_byte(*n), lmok::node_end_byte(*n), args[4].s};
       else f.metadata = lmok::parse_rule_metadata(args[4].s);
     }
-    auto &suppression=host.suppressions.try_emplace(n->owner,n->owner->source()).first->second;
+    const auto alias=host.suppression_owners.find(n->owner);
+    const auto *owner=alias==host.suppression_owners.end()?n->owner:alias->second;
+    auto &suppression=host.suppressions.try_emplace(owner,owner->source()).first->second;
     if(suppression.drop(static_cast<size_t>(f.row),f.rule,host.no_suppress))return Value::none();
     if (host.findings.size() >= 65536)
       throw dslvm::Error("report limit exceeded (65536)");
@@ -548,7 +552,7 @@ int expand_targets(const std::vector<std::string> &args, size_t first, std::vect
         if (!it->is_regular_file(file_ec)) continue;
         lmok::Grammar grammar;
         if (!grammar_for_extension(p.extension().u8string(), grammar)) continue;
-        if (only && grammar != *only) continue;
+        if (only && grammar != *only && !(*only==lmok::Grammar::Lmcode && grammar==lmok::Grammar::Lmscript)) continue;
         eligible=true;
         if(ignore->ignored(fs::absolute(p)))continue;
         found.push_back(canonical_path(p.u8string()));
@@ -711,7 +715,7 @@ static int run_cli(int argc, char **argv) {
       for(int i=3;i<argc;++i){
         lmok::Grammar grammar=rules.front().grammar;
         grammar_for_extension(std::filesystem::u8path(argv[i]).extension().u8string(),grammar);
-        std::vector<lmok::LintRule> active;for(const auto &r:rules)if(r.grammar==grammar)active.push_back(r);
+        std::vector<lmok::LintRule> active;for(const auto &r:rules)if(r.grammar==grammar || (grammar==lmok::Grammar::Lmscript && r.grammar==lmok::Grammar::Lmcode))active.push_back(r);
         if(active.empty())throw dslvm::Error("test fixture has no rules for its language: "+std::string(argv[i]));
         const auto result=lmok::test_rule_file(active,grammar,argv[i],read_file(argv[i]));
         total.expected+=result.expected;total.actual+=result.actual;total.diff.insert(total.diff.end(),result.diff.begin(),result.diff.end());
@@ -1163,13 +1167,16 @@ static int run_cli(int argc, char **argv) {
       try { raw = read_file(path); }
       catch (const dslvm::Error &e) { std::cerr << e.what() << "\n"; return 3; }
     }
-    lmok::Tree tree;
-    try { tree = lmok::parse(grammar, raw); }
+    std::vector<lmok::Tree> trees;
+    try { trees=lmok::analysis_trees(grammar,raw,std::filesystem::u8path(path).extension()==".lms"); }
     catch (const std::length_error &e) { std::cerr << e.what() << "\n"; return 3; }
     if (!is_query) {
-      std::cout << lmok::tree_sexp(tree) << "\n";
+      for(const auto &tree:trees)std::cout << lmok::tree_sexp(tree) << "\n";
       return std::cout ? 0 : 4;
     }
+    // Validate even a file with no nonempty bodies.
+    if(trees.empty()){const auto empty=lmok::parse(grammar,"");try{lmok::node_query(lmok::node_root(empty),code_pattern?compiled.query:pattern,grammar);}catch(const lmok::QueryError &e){std::cerr<<e.what()<<"\n";return 3;}}
+    for(const auto &tree:trees){
     lmok::NodeList captures;
     try {
       if (code_pattern) {
@@ -1186,6 +1193,7 @@ static int run_cli(int argc, char **argv) {
       std::cout << lmok::node_kind(node) << " "
                 << lmok::node_start_row(node) << ":" << lmok::node_start_col(node)
                 << "-" << lmok::node_end_row(node) << ":" << lmok::node_end_col(node) << "\n";
+    }
     return std::cout ? 0 : 4;
   }
   if (argc >= 2 && std::string(argv[1]) == "findings") {
@@ -1376,8 +1384,9 @@ static int run_cli(int argc, char **argv) {
       else if (ext == ".js") active = &javascript_rules;
       else if (ext == ".ts") active = &typescript_rules;
       else if (ext == ".tsx") active = &tsx_rules;
-      else if (ext == ".lms") active = &lmscript_rules;
-      else if (ext == ".lmcode") active = &lmcode_rules;
+      std::vector<lmok::LintRule> script_rules;
+      if(ext==".lms"){script_rules=lmscript_rules;script_rules.insert(script_rules.end(),lmcode_rules.begin(),lmcode_rules.end());active=&script_rules;}
+      if (ext == ".lmcode") active = &lmcode_rules;
       // A file whose language has no rules in the pack: skipped silently when
       // it came from a directory; an explicitly named file still reports.
       if (active->empty() && target.from_dir) continue;
@@ -1387,7 +1396,7 @@ static int run_cli(int argc, char **argv) {
       lmok::Suppression suppression(raw);
       std::vector<lmok::LintFinding> findings;
       try {
-        findings = lmok::lint_text(*active, raw, &suppression, no_suppress);
+        findings = lmok::lint_text(*active, raw, &suppression, no_suppress, nullptr, ext==".lms");
       } catch (const lmok::QueryError &e) {
         std::cerr << e.what() << "\n";
         return 3;
@@ -1404,7 +1413,7 @@ static int run_cli(int argc, char **argv) {
             // Verify + re-lint once in memory before any file write. Reuse the
             // verifier's parsed trees, so the modified bytes are parsed once.
             lmok::Suppression after_suppression(result.text);
-            auto after = lmok::lint_text(*active, result.text, &after_suppression, no_suppress, &result.verified_trees);
+            auto after = lmok::lint_text(*active, result.text, &after_suppression, no_suppress, &result.verified_trees, ext==".lms");
             if (show_diff) std::cout << lmok::unified_fix_diff(target.path, raw, result.text);
             else {
               lmok::write_fixed_file(target.path, raw, result.text);
@@ -1658,7 +1667,7 @@ static int run_cli(int argc, char **argv) {
                                       forced ? &forced_grammar : nullptr)) return rc;
     for (const auto &target : targets) {
       lmok::Grammar grammar = forced_grammar;
-      if (!forced || target.from_dir) {
+      if (!forced || (target.from_dir && forced_grammar!=lmok::Grammar::Lmcode)) {
         const std::string ext = std::filesystem::u8path(target.path).extension().u8string();
         if (!grammar_for_extension(ext, grammar)) {
           std::cerr << "cannot infer the language of " << target.path << " from its extension (use --lang)\n";
@@ -1670,8 +1679,9 @@ static int run_cli(int argc, char **argv) {
       catch (const dslvm::Error &e) { std::cerr << e.what() << "\n"; return 3; }
       std::vector<lmok::Fact> facts;
       try {
-        const lmok::Tree tree = lmok::parse(grammar, raw);
-        facts = lmok::extract_facts(tree, grammar);
+        for(const auto &tree:lmok::analysis_trees(grammar,raw,std::filesystem::u8path(target.path).extension()==".lms")){
+          auto batch=lmok::extract_facts(tree,grammar);facts.insert(facts.end(),batch.begin(),batch.end());
+        }
       } catch (const lmok::QueryError &e) {
         std::cerr << "facts " << target.path << ": " << e.what() << "\n";
         return 3;
@@ -1755,8 +1765,11 @@ static int run_cli(int argc, char **argv) {
       for (const auto &target : check_targets) {
         host.reset(); // transient body/file objects and findings do not escape an input
         where = target.path.c_str();
-        const lmok::Tree tree = lmok::parse(grammar, read_file(target.path));
-        host.suppressions.try_emplace(&tree, tree.source());
+        const auto raw=read_file(target.path);
+        const auto trees=lmok::analysis_trees(grammar,raw,std::filesystem::u8path(target.path).extension()==".lms");
+        for(const auto &tree:trees){
+        host.suppression_owners.emplace(&tree,&trees.front());
+        host.suppressions.try_emplace(&trees.front(),raw);
         lmok::walk_nodes(tree, [&](const lmok::Node &node, const std::vector<lmok::Node> &ancestors) {
           const auto found = by_kind.find(lmok::node_kind(node));
           if (found == by_kind.end()) return;
@@ -1766,7 +1779,8 @@ static int run_cli(int argc, char **argv) {
           const Value handle = host.hold_node(node); // per-file arena; Tree stays alive
           for (size_t entry : found->second) program.call(entry, context, reg, {handle});
         });
-        collect_sarif(target.path, sarif_path ? std::make_shared<const std::string>(tree.source()) : nullptr);
+        }
+        collect_sarif(target.path,sarif_path?std::make_shared<const std::string>(raw):nullptr);
         print_group(where);
         std::cout << "{\"host_summary\":{\"input\":" << dslvm::json_escape(where) << "}}\n";
         if (!std::cout) return 4;

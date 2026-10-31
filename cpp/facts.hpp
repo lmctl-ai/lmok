@@ -21,6 +21,7 @@
 namespace lmok {
 
 struct Fact {
+  std::string language; // injected facts retain their inner grammar; file ownership stays outer
   std::string kind;       // def.function, def.key, ref.call, ref.include, ...
   std::string name;       // as written (quotes/angle brackets stripped for edges)
   std::string scope;      // "" at top level, else "outer.inner"

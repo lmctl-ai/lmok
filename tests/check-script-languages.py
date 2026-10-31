@@ -125,9 +125,9 @@ class ScriptLanguages(unittest.TestCase):
             ('def.schema', 'host', 2, 0), ('ref.schema', 'host.json', 2, 26),
             ('def.function', 'greet', 3, 3), ('ref.call', 'emit', 3, 29),
             ('ref.call', 'greet', 4, 9), ('ref.marker', '_lmcode_', 5, 4),
-            ('ref.schema', 'host.json', 5, 20)])
-        # The nested function is deliberately absent: injection belongs to S5.
-        self.assertNotIn('inner', [r['name'] for r in rows])
+            ('ref.schema', 'host.json', 5, 20), ('def.function', 'inner', 6, 3)])
+        # S5 includes the inner definition with its own grammar and absolute location.
+        self.assertIn('inner', [r['name'] for r in rows])
         fixture = ROOT / 'tests/fixtures/script-languages/rule.lmcode'
         self.assert_clean_parse('lmcode', fixture)
         result = self.run_host('facts', fixture)

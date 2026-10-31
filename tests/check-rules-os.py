@@ -51,6 +51,14 @@ class RulePacksOS(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(b'LANG001', result.stdout)
             self.assertTrue(result.stdout.endswith(b'LMCODE_RETURN_END\n'), result.stdout)
+    def test_injected_lmcode_compiled_absolute_points(self):
+        binary=self.compile('@function_declaration fn check(n: Node) -> void implements Rule { ts.report(n,"injected","INNER","minor"); }')
+        source=self.work/'injected 雪.lms'
+        source.write_bytes('# 雪\r\np = _lmcode_;\r\nfn inner() -> int { return 1; }\r\nend _lmcode_\r\n'.encode('utf-8'))
+        out=self.run_host('check','--lang','lmcode',binary,source)
+        self.assertEqual(out.returncode,0,out.stderr)
+        rows=json.loads(out.stdout.splitlines()[0]);self.assertEqual([(r['row'],r['col'],r['end_row'],r['end_col'],r['rule']) for r in rows],[(2,0,2,31,'INNER')])
+        self.assertTrue(out.stdout.endswith(b'LMCODE_RETURN_END\n'))
     def run_host(self, *args, cwd=None):
         result = subprocess.run([str(HOST), *map(str, args)], cwd=cwd, capture_output=True, timeout=30)
         if MUTATE: result.stdout += b'\r'  # Deliberate output corruption: every byte oracle must reject it.

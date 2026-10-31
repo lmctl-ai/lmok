@@ -98,7 +98,7 @@ int run_project_ci(const ProjectConfig &config, const std::string &root,
     if (!grammar_for_extension(ext, file_grammar)) continue;
     std::vector<LintRule> file_rules;
     for (const auto &rule : rules)
-      if (rule.grammar == file_grammar) file_rules.push_back(rule);
+      if (rule.grammar == file_grammar || (file_grammar==Grammar::Lmscript && rule.grammar==Grammar::Lmcode)) file_rules.push_back(rule);
     if (file_rules.empty()) continue;
     std::string source;
     try { source = read_file(path); }
@@ -108,7 +108,7 @@ int run_project_ci(const ProjectConfig &config, const std::string &root,
         : std::shared_ptr<const std::string>{};
     Suppression suppression(source);
     std::vector<LintFinding> findings;
-    try { findings = lint_text(file_rules, source, &suppression, no_suppress); }
+    try { findings = lint_text(file_rules, source, &suppression, no_suppress, nullptr, file_grammar==Grammar::Lmscript); }
     catch (const std::exception &e) { std::cerr << e.what() << "\n"; return 3; }
     suppression.warn(path, ids);
     suppressed_count += suppression.suppressed;

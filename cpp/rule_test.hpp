@@ -31,7 +31,9 @@ inline RuleTestResult test_rule_file(const std::vector<LintRule> &rules,Grammar 
     }
     if(!any||(!ids.empty()&&ids.back()==','))throw dslvm::Error(path+":"+std::to_string(row)+": empty lmok-expect rule");
   };
-  for(const auto &node:tree_nodes(tree).items){
+  const auto injected=grammar==Grammar::Lmscript?lmcode_injections(tree):std::vector<Tree>{};
+  std::vector<const Tree *> inputs{&tree};for(const auto &inner:injected)inputs.push_back(&inner);
+  for(const Tree *input:inputs)for(const auto &node:tree_nodes(*input).items){
     const auto kind=node_kind(node);
     if(kind.find("comment")!=std::string::npos)comment(node,0,0);
     // C's preprocessor grammar makes the value one opaque token, including
@@ -44,7 +46,7 @@ inline RuleTestResult test_rule_file(const std::vector<LintRule> &rules,Grammar 
     }
   }
   // No ignores/suppression/baseline: they must not make an oracle silently clean.
-  for(const auto &finding:lint_text(rules,source))actual.insert({finding.row+1,finding.rule});
+  for(const auto &finding:lint_text(rules,source,nullptr,false,nullptr,grammar==Grammar::Lmscript))actual.insert({finding.row+1,finding.rule});
   RuleTestResult result;result.expected=expected.size();result.actual=actual.size();
   for(const auto &item:expected)if(!actual.count(item))result.diff.push_back({path,item.second,"missing",item.first});
   for(const auto &item:actual)if(!expected.count(item))result.diff.push_back({path,item.second,"unexpected",item.first});

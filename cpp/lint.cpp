@@ -224,18 +224,22 @@ std::vector<LintRule> load_rule_pack(const std::string &path) {
   return rules;
 }
 
-std::vector<LintFinding> lint_text(const std::vector<LintRule> &rules, const std::string &text, Suppression *suppression, bool no_suppress, const std::map<Grammar, Tree> *parsed) {
+std::vector<LintFinding> lint_text(const std::vector<LintRule> &rules, const std::string &text, Suppression *suppression, bool no_suppress, const std::map<Grammar, Tree> *parsed, bool lmscript_container) {
   std::vector<LintFinding> findings;
   for (const Grammar grammar : {Grammar::Json, Grammar::C, Grammar::Python, Grammar::Bash, Grammar::Java, Grammar::Go, Grammar::Javascript, Grammar::Typescript, Grammar::Tsx, Grammar::Lmscript, Grammar::Lmcode}) {
     std::vector<const LintRule *> here;
     for (const auto &rule : rules)
       if (rule.grammar == grammar) here.push_back(&rule);
     if (here.empty()) continue;
-    Tree owned;
-    const Tree *verified = nullptr;
-    if (parsed) { const auto found = parsed->find(grammar); if (found != parsed->end()) verified = &found->second; }
-    if (!verified) { owned = parse(grammar, text); verified = &owned; }
-    const Tree &tree = *verified;
+    std::vector<Tree> owned;
+    std::vector<const Tree *> inputs;
+    // A verified whole-file lmcode parse is not an injection forest.
+    if(parsed && !(grammar==Grammar::Lmcode && lmscript_container)){
+      const auto found=parsed->find(grammar);if(found!=parsed->end())inputs.push_back(&found->second);
+    }
+    if(inputs.empty()){owned=analysis_trees(grammar,text,lmscript_container);for(const auto &tree:owned)inputs.push_back(&tree);}
+    for(const Tree *input:inputs){
+    const Tree &tree=*input;
     const Node root = node_root(tree);
 
     // Lint retains its named-node kind index; check uses the corresponding
@@ -307,6 +311,7 @@ std::vector<LintFinding> lint_text(const std::vector<LintRule> &rules, const std
       for (const Node &node : captures.items) maybe_emit(*rule, node, findings, suppression, no_suppress);
     }
   }
+    } // one independent tree per injected body
   std::stable_sort(findings.begin(), findings.end(), [](const LintFinding &a, const LintFinding &b) {
     return a.row < b.row || (a.row == b.row && a.col < b.col);
   });

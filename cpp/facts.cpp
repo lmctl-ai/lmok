@@ -162,6 +162,12 @@ std::vector<Fact> extract_facts(const Tree &tree, Grammar grammar) {
   std::vector<Fact> facts;
   facts.reserve(raws.size());
   for (Raw &raw : raws) facts.push_back(std::move(raw.fact));
+  if(grammar==Grammar::Lmscript){
+    for(const auto &inner:lmcode_injections(tree)){
+      auto injected=extract_facts(inner,Grammar::Lmcode);
+      for(auto &fact:injected){fact.language="lmcode";facts.push_back(std::move(fact));}
+    }
+  }
   std::stable_sort(facts.begin(), facts.end(), [](const Fact &a, const Fact &b) {
     if (a.start_byte != b.start_byte) return a.start_byte < b.start_byte;
     if (a.kind != b.kind) return a.kind < b.kind;
@@ -179,7 +185,7 @@ std::vector<Fact> extract_facts(const Tree &tree, Grammar grammar) {
 std::string fact_json(const Fact &f, const std::string &file, const std::string &lang,
                       const std::function<std::string(const std::string &)> &escape) {
   std::ostringstream out;
-  out << "{\"file\":\"" << escape(file) << "\",\"lang\":\"" << lang
+  out << "{\"file\":\"" << escape(file) << "\",\"lang\":\"" << (f.language.empty()?lang:f.language)
       << "\",\"kind\":\"" << f.kind << "\",\"name\":\"" << escape(f.name)
       << "\",\"scope\":\"" << escape(f.scope) << "\",\"confidence\":\"" << f.confidence
       << "\",\"row\":" << f.row << ",\"col\":" << f.col

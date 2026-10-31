@@ -67,7 +67,7 @@ std::vector<LintRule> load_rule_pack(const std::string &path);
 // ancestor is (is not) the root of a match of that pattern, over one parent map
 // per file built from a single cursor walk. Findings are sorted by (row, col).
 // A query compile failure throws QueryError with the rule id prepended.
-std::vector<LintFinding> lint_text(const std::vector<LintRule> &rules, const std::string &text, Suppression *suppression = nullptr, bool no_suppress = false, const std::map<Grammar, Tree> *parsed = nullptr);
+std::vector<LintFinding> lint_text(const std::vector<LintRule> &rules, const std::string &text, Suppression *suppression = nullptr, bool no_suppress = false, const std::map<Grammar, Tree> *parsed = nullptr, bool lmscript_container = false);
 
 class Database;
 

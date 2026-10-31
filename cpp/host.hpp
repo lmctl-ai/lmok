@@ -47,6 +47,7 @@ private:
   friend const void *tree_handle(const Tree &tree);
   friend std::string node_text(const Node &node);
   friend Tree parse(Grammar grammar, const std::string &text);
+  friend Tree parse_range(Grammar grammar, const Node &body);
   friend void tree_edit(Tree &tree, int64_t start_byte, int64_t old_end_byte, int64_t new_end_byte);
   friend Tree reparse(Grammar grammar, Tree &old_tree, const std::string &new_text);
   friend std::string changed_ranges_json(const Tree &old_tree, const Tree &new_tree);
@@ -77,6 +78,13 @@ struct Node {
 // UINT32_MAX bytes (tree-sitter's own byte-offset limit) instead of silently
 // truncating.
 Tree parse(Grammar grammar, const std::string &text);
+
+// Parse the exact body range while retaining absolute points/bytes and full source ownership.
+Tree parse_range(Grammar grammar, const Node &body);
+// A standalone input yields one tree; lmcode selected on a lmscript container
+// yields one tree per named lmcode_body, in source order (none for empty bodies).
+std::vector<Tree> analysis_trees(Grammar grammar, const std::string &text, bool lmscript_container = false);
+std::vector<Tree> lmcode_injections(const Tree &outer);
 
 // Record an edit on the tree (byte offsets; insertion is old_end == start,
 // deletion is new_end == start). The edit is APPLIED at reparse time, when

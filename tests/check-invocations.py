@@ -46,7 +46,7 @@ assert(!r.ok&&r.phase=="app"&&!r.has("part")&&!r.has("result")&&!r.has("parts"),
 println("PASS real lmok invocation integration");
 '''
   file=work/'real.lms';file.write_text(source)
-  p=subprocess.run([os.environ.get('LMSCRIPT_BIN','lmscript'),'--no-preflight',str(file)],cwd=ROOT,capture_output=True)
+  p=subprocess.run([os.environ.get('LMSCRIPT_BIN','lmscript'),str(file)],cwd=ROOT,capture_output=True)
   assert p.returncode==0 and b'PASS real lmok invocation integration' in p.stdout,(p.returncode,p.stdout,p.stderr)
   for line in p.stdout.splitlines():
    if line.startswith(b'{"host_summary":'):assert set(json.loads(line))=={'host_summary'}

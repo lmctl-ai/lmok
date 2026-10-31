@@ -47,6 +47,10 @@ class NativeOS(unittest.TestCase):
             self.exact(self.run_host('query', '--lang', lang,
                 '(function_declaration (identifier) @name)', source),
                 b'identifier 0:3-0:4\n')
+    def test_injected_lmcode_absolute_query(self):
+        source=self.work/'injected 雪.lms'
+        source.write_bytes('# 雪\r\np = _lmcode_;\r\nfn inner() -> int { return 1; }\r\nend _lmcode_\r\n'.encode('utf-8'))
+        self.exact(self.run_host('query','--lang','lmcode','(function_declaration (identifier) @name)',source),b'identifier 2:3-2:8\n')
     def run_host(self, *args, data=None, cwd=None, binary=HOST):
         result = subprocess.run([str(binary), *map(str, args)], input=data, cwd=cwd, capture_output=True, timeout=15)
         if MUTATE: result.stdout += b'\r'  # Deliberate output corruption: every byte oracle must reject it.

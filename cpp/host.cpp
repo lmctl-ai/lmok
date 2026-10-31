@@ -133,6 +133,31 @@ Tree parse(Grammar grammar, const std::string &text) {
   return result;
 }
 
+Tree parse_range(Grammar grammar, const Node &body) {
+  const TSNode &node=ts(body);
+  const TSRange range{ts_node_start_point(node),ts_node_end_point(node),ts_node_start_byte(node),ts_node_end_byte(node)};
+  TSParser *parser=ts_parser_new();
+  ts_parser_set_language(parser,language_of(grammar));
+  if(!ts_parser_set_included_ranges(parser,&range,1)){ts_parser_delete(parser);throw std::runtime_error("invalid injection range");}
+  Tree result;
+  result.source_=body.owner->source();
+  result.tree_=ts_parser_parse_string(parser,nullptr,result.source_.data(),static_cast<uint32_t>(result.source_.size()));
+  ts_parser_delete(parser);
+  return result;
+}
+
+std::vector<Tree> lmcode_injections(const Tree &outer) {
+  std::vector<Tree> trees;
+  for(const auto &node:tree_nodes(outer).items)
+    if(node_kind(node)=="lmcode_body")trees.push_back(parse_range(Grammar::Lmcode,node));
+  return trees;
+}
+
+std::vector<Tree> analysis_trees(Grammar grammar,const std::string &text,bool lmscript_container) {
+  if(grammar==Grammar::Lmcode && lmscript_container){const auto outer=parse(Grammar::Lmscript,text);return lmcode_injections(outer);}
+  std::vector<Tree> trees;trees.push_back(parse(grammar,text));return trees;
+}
+
 static TSPoint point_for_byte(const std::string &source, uint32_t byte) {
   TSPoint point = {0, 0};
   const uint32_t limit = std::min<uint32_t>(byte, source.size());

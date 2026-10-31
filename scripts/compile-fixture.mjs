@@ -16,7 +16,7 @@ try {
  const variable=lines[start].match(/(\w+)\s*=\s*_lmcode_/)[1];
  lines[start]=variable+' = _lmcode_ schema='+JSON.stringify(path.resolve('schema/lmok.dsl.json'))+';';
  raw=lines.slice(0,end+1).join('\n');
- const result=await engine.runAsync(raw+'\nfixture_capture('+variable+');',{file:source,noPreflight:true,platform:{cwd:path.dirname(source),env:process.env}});
+ const result=await engine.runAsync(raw+'\nfixture_capture('+variable+');',{file:source,hostContext:{cwd:path.dirname(source),env:process.env}});
  if(!result.success){for(const d of result.diagnostics)console.error(`${source}:${d.line}:${d.column}: ${d.message}`);process.exitCode=result.exitCode??2;}
  else if(!check){if(!bytes)throw Error('fixture did not construct program');fs.writeFileSync(output,bytes);}
 }catch(e){console.error(`${source}:1:1: ${e.message}`);process.exitCode=2;}
