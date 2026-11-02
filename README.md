@@ -620,7 +620,7 @@ a candidate set, never a resolution.
 action and every selection list is a REST endpoint (`GET /` lists them). It
 starts from a preset, accepts setting changes, keeps recent results by id,
 caches side-effect-free commands keyed on their input bytes, and stops on
-`POST /v1/shutdown` or after its idle timeout. `lmok remote` replays one
+`POST /v1/shutdown` or after an explicitly configured idle timeout. `lmok remote` replays one
 command through the server and can be the host command of `run_lmcode`.
 
 ```sh

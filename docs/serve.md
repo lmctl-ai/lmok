@@ -24,7 +24,8 @@ build/lmok serve --list-presets
 | `--idle-timeout S` | Override the starting preset's `idle_timeout_s`. |
 | `--state-dir DIR` | Where uploads live (default: a per-process temp directory, removed on exit). |
 
-The server stops on `POST /v1/shutdown` or once no request has arrived for
+The server has no socket deadline or request-size limit by default. It stops on
+`POST /v1/shutdown`, or once no request has arrived for an explicitly selected
 `idle_timeout_s` seconds (`0` disables the timeout), printing
 `lmok serve: stopped (shutdown requested|idle timeout)` and exiting 0. Requests
 are served one at a time, in arrival order.
@@ -91,7 +92,7 @@ preset or result, 405 wrong method (with `Allow`), 413 body over
 
 | Setting | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `idle_timeout_s` | integer | 300 | Exit after this many quiet seconds; 0 = never. |
+| `idle_timeout_s` | integer | 0 | Exit after this many quiet seconds; 0 = never. |
 | `cache` | boolean | true | Reuse results while inputs are unchanged. |
 | `cache_max_entries` | integer | 256 | LRU capacity. |
 | `cache_lmcode` | boolean | false | Also cache `--lmcode` runs. |
@@ -100,7 +101,7 @@ preset or result, 405 wrong method (with `Allow`), 413 body over
 | `pack` | string | "" | Default rule pack for `/v1/lint` and `/v1/rules`. |
 | `metadata` | boolean | false | Add `--metadata` to lint and lmcode runs. |
 | `cwd` | string | "" | Command working directory; "" = where the server started. |
-| `max_body_bytes` | integer | 16 MiB | Largest accepted request body. |
+| `max_body_bytes` | integer | 0 | Largest accepted request body; 0 = unlimited. |
 
 Built-in presets: `default`, `interactive` (no idle timeout, long history),
 `ci` (2 minute timeout, short history), `fresh` (no cache), `memo` (cache
@@ -172,3 +173,7 @@ result object, and `--api METHOD PATH [BODY]` presses any button directly
 through the server and requires identical output. The `serve` workflow runs
 both, plus the tour, on Linux x64/arm64, macOS arm64/x64 and Windows x64;
 `test.sh` (run by `ci.yml` on the same five platforms) includes the REST contract.
+
+Default `idle_timeout_s` and `max_body_bytes` are both `0` (unbounded). An explicit
+positive body limit or idle setting remains available. `lmok remote` installs no
+receive/send deadline, so a long command can drain normally.

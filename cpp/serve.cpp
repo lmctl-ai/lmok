@@ -443,19 +443,6 @@ bool resolve_ipv4(const std::string &host, in_addr &addr) {
   return inet_pton(AF_INET, h.c_str(), &addr) == 1;
 }
 
-void set_timeouts(socket_t s, int seconds) {
-#ifdef _WIN32
-  DWORD ms = DWORD(seconds) * 1000;
-  setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&ms), sizeof ms);
-  setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&ms), sizeof ms);
-#else
-  timeval tv{};
-  tv.tv_sec = seconds;
-  setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
-  setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
-#endif
-}
-
 bool send_all(socket_t s, const std::string &data) {
   size_t sent = 0;
   while (sent < data.size()) {
@@ -546,7 +533,6 @@ int read_request(socket_t s, Request &req, size_t max_body) {
     if (n <= 0) return buf.empty() ? -1 : 400;
     buf.append(chunk, size_t(n));
     header_end = buf.find("\r\n\r\n");
-    if (header_end == std::string::npos && buf.size() > 65536) return 431;
   }
   std::istringstream head(buf.substr(0, header_end));
   std::string line;
@@ -573,7 +559,7 @@ int read_request(socket_t s, Request &req, size_t max_body) {
   if (auto it = req.headers.find("content-length"); it != req.headers.end()) {
     try { length = size_t(std::stoull(it->second)); } catch (...) { return 400; }
   }
-  if (length > max_body) { // drain (bounded) so the client sees the 413 rather than a reset
+  if (max_body != 0 && length > max_body) { // drain (bounded) so the client sees the 413 rather than a reset
     size_t seen = buf.size() - header_end - 4;
     while (seen < length && seen < (size_t(64) << 20)) {
       long n = recv_some(s, chunk, sizeof chunk);
@@ -650,14 +636,14 @@ const std::vector<SettingSpec> &setting_specs() {
       {"pack", Json::String, "Default rule pack for /v1/lint (path relative to cwd)."},
       {"metadata", Json::Bool, "Add --metadata to lint, check and lmcode runs."},
       {"cwd", Json::String, "Working directory for commands; empty means the directory the server started in."},
-      {"max_body_bytes", Json::Number, "Largest accepted request body."},
+      {"max_body_bytes", Json::Number, "Largest accepted request body; 0 means unlimited."},
   };
   return specs;
 }
 
 Json default_settings() {
   Json s = Json::object();
-  s.set("idle_timeout_s", Json::of(300));
+  s.set("idle_timeout_s", Json::of(0));
   s.set("cache", Json::of(true));
   s.set("cache_max_entries", Json::of(256));
   s.set("cache_lmcode", Json::of(false));
@@ -666,7 +652,7 @@ Json default_settings() {
   s.set("pack", Json::of(""));
   s.set("metadata", Json::of(false));
   s.set("cwd", Json::of(""));
-  s.set("max_body_bytes", Json::of(16 * 1024 * 1024));
+  s.set("max_body_bytes", Json::of(0));
   return s;
 }
 
@@ -683,7 +669,6 @@ void merge_settings(Json &settings, const Json &patch) {
       throw HttpError(422, "invalid_setting", "setting '" + f.first + "' must be a non-negative integer");
     if (f.first == "cache_max_entries" && f.second.integer > 100000) throw HttpError(422, "invalid_setting", "cache_max_entries is at most 100000");
     if (f.first == "results_max" && (f.second.integer < 1 || f.second.integer > 10000)) throw HttpError(422, "invalid_setting", "results_max must be 1..10000");
-    if (f.first == "max_body_bytes" && f.second.integer < 1024) throw HttpError(422, "invalid_setting", "max_body_bytes must be at least 1024");
     if (f.first == "cwd" && !f.second.text.empty()) {
       std::error_code ec;
       if (!fs::is_directory(fs::u8path(f.second.text), ec)) throw HttpError(422, "invalid_setting", "cwd is not a directory: " + f.second.text);
@@ -708,7 +693,7 @@ std::vector<Preset> builtin_presets() {
     return p;
   };
   return {
-      make("default", "Balanced: 5 minute idle timeout, result cache on.", {}),
+      make("default", "No idle deadline or body limit; result cache on.", {}),
       make("interactive", "Never time out; long result history for exploratory sessions.",
            {{"idle_timeout_s", Json::of(0)}, {"results_max", Json::of(512)}}),
       make("ci", "Short-lived build helper: 2 minute idle timeout, small history.",
@@ -1698,7 +1683,6 @@ int serve_main(const std::vector<std::string> &args, CliEntry cli) {
     if (ready <= 0) continue;
     socket_t client = ::accept(listener, nullptr, nullptr);
     if (client == BAD_SOCKET) continue;
-    set_timeouts(client, 30);
     Request req;
     int status = read_request(client, req, size_t(setting_int(server->settings(), "max_body_bytes")));
     if (status == 0) {
@@ -1767,7 +1751,6 @@ HttpReply http_call(const Url &url, const std::string &method, const std::string
     reply.error = "cannot connect to http://" + url.host + ":" + std::to_string(url.port);
     return reply;
   }
-  set_timeouts(s, 600);
   std::string req = method + " " + path + " HTTP/1.1\r\nHost: " + url.host + ":" + std::to_string(url.port) +
                     "\r\nUser-Agent: lmok-remote/" LMOK_VERSION "\r\nAccept: application/json\r\nConnection: close\r\n";
   if (!body.empty() || method == "POST" || method == "PUT" || method == "PATCH")
