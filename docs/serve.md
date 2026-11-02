@@ -158,6 +158,11 @@ result object, and `--api METHOD PATH [BODY]` presses any button directly
   with `lmok remote` as its host command).
 - [examples/serve/buttons.lms](../examples/serve/buttons.lms) — choose a
   preset, change settings, lint twice (the second is cached), read history.
+- [examples/serve/triage.lms](../examples/serve/triage.lms) — an interactive
+  triage: lint one file, locate the warning's function, search the folder for
+  its callers, refine with a predicate query on each call site, widen the lint,
+  and revisit from the cache. `tests/check-serve-triage.py` runs the same
+  session and then fixes the file to prove stale cache entries are not reused.
 - [examples/serve/rest-tour.sh](../examples/serve/rest-tour.sh) — a curl
   tour that starts its own server and presses each kind of button.
 - [examples/serve/presets.json](../examples/serve/presets.json) — custom presets.

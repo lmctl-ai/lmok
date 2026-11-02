@@ -1,0 +1,93 @@
+# Chapter: Server - triage a warning interactively, widening step by step
+# Shows: one server session; each request builds on the previous answers
+# Run: lmok serve & LMOK_SERVER=http://127.0.0.1:7700 lmscript examples/serve/triage.lms
+# Needs: build/lmok on PATH and a server at $LMOK_SERVER; repo root cwd.
+# exit: 0
+# expect:
+#|1 scan:    tests/fixtures/serve-triage/names.c:6 LBC001 unsafe call 'strcpy'
+#|2 locate:  inside copy_name(dst, src)
+#|3 search:  callers main.c:7 report.c:4, declared in names.h
+#|4 refine:  main.c:7 passes argv[1] -> confirmed
+#|4 refine:  report.c:4 passes "report" -> benign
+#|5 widen:   callers have 0 other warnings
+#|6 revisit: cached=true
+
+dir = "tests/fixtures/serve-triage";
+pack = "rules/c-tier1.json";
+
+fn api(path, body) {
+  let r = system(["lmok", "remote", "--api", "POST", path, json_stringify(body)]);
+  assert(r.code == 0, path + " failed: " + r.stdout);
+  return json_parse(r.stdout);
+}
+
+# JSON-lines stdout of a command result.
+fn rows(result) {
+  let out = [];
+  for (line in split(result.stdout, "\n")) {
+    if (starts_with(line, "{")) { push(out, json_parse(line)); }
+  }
+  return out;
+}
+
+fn base(path) {
+  let parts = split(path, "/");
+  return parts[len(parts) - 1];
+}
+
+# 1. Scan one local file.
+scan = api("/v1/lint", {file: dir + "/names.c", pack: pack});
+warnings = [];
+for (r in rows(scan)) { if (r.rule != null) { push(warnings, r); } }
+assert(len(warnings) == 1, "expected one warning");
+w = warnings[0];
+println("1 scan:    " + dir + "/names.c:" + str(w.row + 1) + " " + w.rule + " " + w.message);
+
+# 2. Locate it: which function of that file holds the warning?
+sink = "";
+params = [];
+local = rows(api("/v1/facts", {file: dir + "/names.c"}));
+for (f in local) {
+  if (f.kind == "def.function" && f.row <= w.row && w.row <= f.end_row) { sink = f.name; }
+}
+for (f in local) {
+  if (f.kind == "def.parameter" && f.scope == sink) { push(params, f.name); }
+}
+println("2 locate:  inside " + sink + "(" + join(params, ", ") + ")");
+
+# 3. Deep search: the related files in the same folder that call or declare it.
+callers = [];
+declared = [];
+for (f in rows(api("/v1/facts", {files: [dir]}))) {
+  if (f.kind == "ref.call" && f.name == sink) { push(callers, f); }
+  if (f.kind == "def.prototype" && f.name == sink) { push(declared, base(f.file)); }
+}
+sites = [];
+for (c in callers) { push(sites, base(c.file) + ":" + str(c.row + 1)); }
+println("3 search:  callers " + join(sort(sites), " ") + ", declared in " + join(declared, " "));
+
+# 4. Refine: only the calls to the sink, and what each passes as `src`.
+pattern = "((call_expression function: (identifier) @fn arguments: (argument_list (_) (_) @src)) (#eq? @fn \"" + sink + "\"))";
+caller_files = [];
+for (c in callers) {
+  push(caller_files, c.file);
+  let q = api("/v1/query", {pattern: pattern, file: c.file, lang: "c"});
+  let lines = split(trim(q.stdout), "\n");
+  let parts = split(lines[1], " ");
+  let span = split(parts[1], "-");
+  let from = split(span[0], ":");
+  let to = split(span[1], ":");
+  let line = read_lines(c.file)[num(from[0])];
+  let text = substr(line, num(from[1]), num(to[1]) - num(from[1]));
+  let verdict = "benign";
+  if (parts[0] != "string_literal") { verdict = "confirmed"; }
+  println("4 refine:  " + base(c.file) + ":" + str(c.row + 1) + " passes " + text + " -> " + verdict);
+}
+
+# 5. Widen the lint to the callers.
+wider = api("/v1/lint", {files: caller_files, pack: pack});
+println("5 widen:   callers have " + str(count_matches(wider.stdout, "\"rule\":")) + " other warnings");
+
+# 6. Revisit step 1: the server answers from its cache.
+again = api("/v1/lint", {file: dir + "/names.c", pack: pack});
+println("6 revisit: cached=" + str(again.cached));

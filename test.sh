@@ -1336,5 +1336,7 @@ done
 # --- lmok serve / lmok remote: REST server contract (tests/check-serve.py) ---
 python3 tests/check-serve.py "$HOST" build/parse-file.dslb || fail "lmok serve REST contract"
 ok "lmok serve: buttons, presets, settings, cache, results, remote client, shutdown and idle timeout"
+python3 tests/check-serve-triage.py "$HOST" || fail "lmok serve triage session"
+ok "lmok serve: scan one file, deep-search related files, refine, fix and re-verify in one session"
 
 echo "PASS: $pass checks"

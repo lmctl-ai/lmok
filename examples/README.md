@@ -165,5 +165,6 @@ Any example above also runs through a server: replace `run_lmcode(p)` with
 
 - `serve/text-template.lms` — render a text template on the server.
 - `serve/buttons.lms` — presets, settings, cached lint and result history from lmscript.
+- `serve/triage.lms` — scan one file, then search and refine across its folder in one session.
 - `serve/rest-tour.sh` — a self-contained curl tour of the REST buttons.
 - `serve/presets.json` — custom presets for `lmok serve --presets`.

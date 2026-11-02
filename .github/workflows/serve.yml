@@ -1,7 +1,7 @@
 name: serve
 
 # Integration tests for `lmok serve` (REST server) and `lmok remote` (client):
-# the REST contract, every examples/*.lms run locally and through the server
+# the REST contract, a multi-step triage session, every examples/*.lms run locally and through the server
 # with byte-identical output, the server-only examples, and the curl tour,
 # on the same five platforms ci.yml builds.
 on:
@@ -87,6 +87,9 @@ jobs:
         run: |
           node scripts/compile-fixture.mjs examples/parse-file.lms build/parse-file.dslb
           python3 tests/check-serve.py "$LMOK_HOST" build/parse-file.dslb
+
+      - name: interactive triage session (scan one file, search the folder, refine, fix)
+        run: python3 tests/check-serve-triage.py "$LMOK_HOST"
 
       - name: every lmscript example, locally and through the server
         run: python3 tests/check-serve-examples.py "$LMOK_HOST"
