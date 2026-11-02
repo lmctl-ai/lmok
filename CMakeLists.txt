@@ -128,6 +128,7 @@ add_executable(lmok
   cpp/search.cpp
   cpp/baseline.cpp
   cpp/sarif.cpp
+  cpp/serve.cpp
   $<TARGET_OBJECTS:lmok_sqlite>
   cpp/facts.cpp
   cpp/metrics.cpp
@@ -180,6 +181,10 @@ find_package(Threads REQUIRED)
 target_link_libraries(lmok PRIVATE Threads::Threads)
 if(UNIX)
   target_link_libraries(lmok PRIVATE m)
+endif()
+# lmok serve / lmok remote use Winsock on Windows.
+if(WIN32)
+  target_link_libraries(lmok PRIVATE ws2_32)
 endif()
 
 # Test helper is excluded from the default single-CLI build.

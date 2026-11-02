@@ -1,0 +1,96 @@
+name: serve
+
+# Integration tests for `lmok serve` (REST server) and `lmok remote` (client):
+# the REST contract, every examples/*.lms run locally and through the server
+# with byte-identical output, the server-only examples, and the curl tour.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: serve-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  serve:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, name: linux-x64 }
+          - { os: macos-15,     name: macos-arm64 }
+          - { os: windows-2022, name: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    name: serve (${{ matrix.name }})
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: sync deps (deps.lock)
+        run: scripts/sync-deps.sh
+
+      - name: toolchain (linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build
+
+      - name: toolchain (macos)
+        if: runner.os == 'macOS'
+        run: brew install ninja coreutils
+
+      - name: toolchain (windows)
+        if: runner.os == 'Windows'
+        run: |
+          for i in 1 2 3; do
+            command -v g++ >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1 && break
+            choco install -y mingw ninja && break || sleep 15
+          done
+          command -v g++ >/dev/null 2>&1 || exit 1
+          command -v ninja >/dev/null 2>&1 || exit 1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      # ci.yml's 0.2.451 compiles fixtures fine, but its run_lmcode writes an
+      # invocation manifest without "dry", which the current host refuses, so
+      # every run_lmcode example fails there. 0.2.453 runs them all.
+      - name: lmscript compiler
+        run: |
+          npm i -g @lmctl-ai/lmctl@0.2.453
+          lmscript --version
+          echo "LMCODE_COMPILER_MODULE=$(npm root -g)/@lmctl-ai/lmctl/dist/dsl.js" >> "$GITHUB_ENV"
+
+      - name: build lmok
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j4
+          suffix=""; here="$PWD"
+          if [ "$RUNNER_OS" = Windows ]; then suffix=.exe; here="$(pwd -W)"; fi
+          echo "LMOK_HOST=$here/build/lmok$suffix" >> "$GITHUB_ENV"
+          echo "$here/build" >> "$GITHUB_PATH"
+          "build/lmok$suffix" --version
+          "build/lmok$suffix" serve --list-presets
+
+      - name: REST contract (settings, presets, cache, results, errors, shutdown, idle timeout)
+        run: |
+          node scripts/compile-fixture.mjs examples/parse-file.lms build/parse-file.dslb
+          python3 tests/check-serve.py "$LMOK_HOST" build/parse-file.dslb
+
+      - name: every lmscript example, locally and through the server
+        run: python3 tests/check-serve-examples.py "$LMOK_HOST"
+
+      - name: curl tour of the REST buttons
+        run: LMOK="$LMOK_HOST" examples/serve/rest-tour.sh
+
+      - name: server log on failure
+        if: failure()
+        run: ls -la build/serve-examples 2>/dev/null || true

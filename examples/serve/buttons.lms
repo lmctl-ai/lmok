@@ -1,0 +1,43 @@
+# Chapter: Server - press the REST "buttons" from lmscript
+# Shows: system() with `lmok remote --api`, presets, settings, cache and results
+# Run: lmok serve & LMOK_SERVER=http://127.0.0.1:7700 lmscript examples/serve/buttons.lms
+# Needs: build/lmok on PATH and a server at $LMOK_SERVER; repo root cwd.
+# exit: 0
+# expect:
+#|preset -> go
+#|lint -> 7 findings (cached: false)
+#|lint again -> 7 findings (cached: true)
+#|settings -> results_max 32
+#|reset -> interactive
+
+fn api(method, path, body) {
+  let r = system(["lmok", "remote", "--api", method, path, json_stringify(body)]);
+  assert(r.code == 0, method + " " + path + " failed: " + r.stdout);
+  return json_parse(r.stdout);
+}
+
+# Remember the starting preset, then choose a built-in one and adjust it
+# (custom presets come from `lmok serve --presets examples/serve/presets.json`).
+# Selecting a preset replaces every setting; PATCH changes only the named ones.
+start = api("GET", "/v1/settings", {});
+api("DELETE", "/v1/cache", {});
+api("POST", "/v1/presets/json", {});
+api("PATCH", "/v1/settings", {lang: "go", pack: "rules/go-tier1.json"});
+println("preset -> " + api("GET", "/v1/settings", {}).settings.lang);
+
+# The lint button uses the pack chosen above; the same request is cached
+# until the fixture's bytes change.
+body = {file: "tests/fixtures/go-tier1-violations.go"};
+first = api("POST", "/v1/lint", body);
+println("lint -> " + str(count_matches(first.stdout, "\"rule\":")) + " findings (cached: " + str(first.cached) + ")");
+again = api("POST", "/v1/lint", body);
+println("lint again -> " + str(count_matches(again.stdout, "\"rule\":")) + " findings (cached: " + str(again.cached) + ")");
+
+# Every result stays addressable by id until results_max newer ones arrive.
+kept = api("GET", "/v1/results/" + first.id, {});
+assert(kept.stdout == first.stdout, "result history");
+
+println("settings -> results_max " + str(api("PATCH", "/v1/settings", {results_max: 32}).settings.results_max));
+if (start.preset != "") {
+  println("reset -> " + api("POST", "/v1/presets/" + start.preset, {}).preset);
+}

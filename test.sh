@@ -1333,4 +1333,8 @@ for find_case in literal fts limit fallback errors; do
   ok "find: $find_case"
 done
 
+# --- lmok serve / lmok remote: REST server contract (tests/check-serve.py) ---
+python3 tests/check-serve.py "$HOST" build/parse-file.dslb || fail "lmok serve REST contract"
+ok "lmok serve: buttons, presets, settings, cache, results, remote client, shutdown and idle timeout"
+
 echo "PASS: $pass checks"

@@ -1,0 +1,21 @@
+# Chapter: Server - render a text template on a running `lmok serve`
+# Shows: run_lmcode with a custom command; `lmok remote` uploads the program
+# Run: lmok serve & LMOK_SERVER=http://127.0.0.1:7700 lmscript examples/serve/text-template.lms
+# Needs: README setup; build/lmok on PATH and a server at $LMOK_SERVER.
+# exit: 0
+# expect:
+#|Hello, Sam!
+#|Items: 0: apple, 1: pear
+# Context can contain nested maps and lists; the result is ordinary text.
+context = {
+ user: {name:"Sam", active:true},
+ items: [{name:"apple"}, {name:"pear"}]
+};
+template = "Hello, <user.name>!\n<if(user.active)>Items: <items:{item|<index>: <item.name>}; separator=\", \"><else>Inactive<endif>";
+program = _lmcode_ cli="lmok";
+println(template_render(${template}, json_parse(${json_stringify(context)})));
+end _lmcode_
+
+# The only change from a local run: the host command is the REST client.
+r = run_lmcode(program, {command:["lmok", "remote", "--lmcode", "$DSLFILE"]});
+assert(r.ok, "lmok server run failed");

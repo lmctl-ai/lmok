@@ -1,0 +1,14 @@
+{
+  "presets": [
+    {
+      "name": "go-review",
+      "description": "Go review session: Go tier-1 pack, rule metadata, 10 minute idle timeout.",
+      "settings": {"lang": "go", "pack": "rules/go-tier1.json", "metadata": true, "idle_timeout_s": 600}
+    },
+    {
+      "name": "web",
+      "description": "TypeScript front end: TypeScript tier-1 pack, large cache.",
+      "settings": {"lang": "typescript", "pack": "rules/typescript-tier1.json", "cache_max_entries": 2048}
+    }
+  ]
+}

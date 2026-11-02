@@ -16,6 +16,8 @@ No Node runtime is needed to run the standalone binary.
   `findings` and `status`; `facts` also exports records without a DB.
 - Emit SARIF 2.1.0, compare baselines, preview/apply guarded autofixes, scan
   secret-shaped literals with redacted output, and honor inline suppressions.
+- Serve every command over a local REST API (`lmok serve`, client `lmok remote`)
+  with presets, editable settings, result history and an input-aware cache.
 - Run configured project checks through `ci`, or script the host with
   [lmscript](https://github.com/lmctlhq/lmctl-mono).
 
@@ -611,6 +613,25 @@ explicitly named files and filters a directory to that language; without it
 the extension decides and an unknown extension is a usage error (exit 2).
 Nothing here infers types, expands macros or evaluates `#if`: a reference is
 a candidate set, never a resolution.
+
+## REST server (`serve`, `remote`)
+
+`lmok serve` runs lmok as a small local web application without a page: every
+action and every selection list is a REST endpoint (`GET /` lists them). It
+starts from a preset, accepts setting changes, keeps recent results by id,
+caches side-effect-free commands keyed on their input bytes, and stops on
+`POST /v1/shutdown` or after its idle timeout. `lmok remote` replays one
+command through the server and can be the host command of `run_lmcode`.
+
+```sh
+build/lmok serve --preset interactive &
+curl -s -X POST http://127.0.0.1:7700/v1/parse -d '{"text":"[1,2]","lang":"json"}'
+LMOK_SERVER=http://127.0.0.1:7700 build/lmok remote lint rules/go-tier1.json tests/fixtures/go-tier1-violations.go
+build/lmok remote --api POST /v1/shutdown
+```
+
+See [docs/serve.md](docs/serve.md) for the endpoints, settings, presets and
+cache rules, and [examples/serve](examples/serve) for runnable examples.
 
 ## Scripting
 

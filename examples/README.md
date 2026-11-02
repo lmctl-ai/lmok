@@ -155,3 +155,15 @@ host to see classification fields while its default output stays byte-compatible
 
 `bash examples/metrics.sh` prints local file metrics, repeated normalized token
 windows, then compiles/runs the C cognitive-complexity threshold pack.
+
+## Server examples
+
+[serve/](serve) holds examples for `lmok serve` (see [docs/serve.md](../docs/serve.md)).
+Any example above also runs through a server: replace `run_lmcode(p)` with
+`run_lmcode(p, {command:["lmok", "remote", "--lmcode", "$DSLFILE"]})` and set
+`LMOK_SERVER`; `tests/check-serve-examples.py` does exactly that for all of them.
+
+- `serve/text-template.lms` — render a text template on the server.
+- `serve/buttons.lms` — presets, settings, cached lint and result history from lmscript.
+- `serve/rest-tour.sh` — a self-contained curl tour of the REST buttons.
+- `serve/presets.json` — custom presets for `lmok serve --presets`.

@@ -17,6 +17,7 @@
 #include "search.hpp"
 #include "baseline.hpp"
 #include "sarif.hpp"
+#include "serve.hpp"
 #include "dslvm.hpp"
 #include "stdlib/string.hpp"
 #include "stdlib/collections.hpp"
@@ -666,6 +667,12 @@ static int run_cli(int argc, char **argv) {
   _setmode(_fileno(stdout), _O_BINARY);
   _setmode(_fileno(stderr), _O_BINARY);
 #endif
+  // REST front end (cpp/serve.cpp): `serve` dispatches requests back into
+  // run_cli in-process; `remote` is its client.
+  if (argc >= 2 && (std::string(argv[1]) == "serve" || std::string(argv[1]) == "remote")) {
+    const std::vector<std::string> args(argv, argv + argc);
+    return std::string(argv[1]) == "serve" ? lmok::serve_main(args, run_cli) : lmok::remote_main(args);
+  }
   std::vector<char *> metadata_argv;
   const bool metadata_verb=argc>=2&&(std::string(argv[1])=="lint"||std::string(argv[1])=="ci"||std::string(argv[1])=="check"||std::string(argv[1])=="--lmcode"||std::string(argv[1])=="--first"||std::string(argv[1])=="--last");
   bool include_metadata=false;
@@ -721,7 +728,9 @@ static int run_cli(int argc, char **argv) {
       "       lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
       "       lmok metrics [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
       "       lmok dup [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--tokens N] FILE|DIR...\n"
-      "       lmok --lmcode FILE [--lmcode FILE ...] [--db PATH]\n";
+      "       lmok --lmcode FILE [--lmcode FILE ...] [--db PATH]\n"
+      "       lmok serve [--port N] [--preset NAME] [--idle-timeout S] ... (REST server; GET / lists actions)\n"
+      "       lmok remote [--server URL] LMOK-ARGS... | --api METHOD PATH [JSON]\n";
   if (argc>=2 && std::string(argv[1])=="rules") {
     if(argc<3){std::cerr<<"rules needs PACK...\n";return 2;}
     try {
