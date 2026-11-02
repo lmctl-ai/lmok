@@ -165,4 +165,5 @@ result object, and `--api METHOD PATH [BODY]` presses any button directly
 `tests/check-serve.py` checks the REST contract against a live server;
 `tests/check-serve-examples.py` runs every `examples/*.lms` locally and again
 through the server and requires identical output. The `serve` workflow runs
-both, plus the tour, on Linux, macOS and Windows.
+both, plus the tour, on Linux x64/arm64, macOS arm64/x64 and Windows x64;
+`test.sh` (run by `ci.yml` on the same five platforms) includes the REST contract.
