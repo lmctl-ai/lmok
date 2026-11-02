@@ -4,7 +4,8 @@ from pathlib import Path
 import subprocess, sys
 ROOT=Path(__file__).resolve().parents[1]
 source=ROOT/'cpp/serve.cpp'
-original=source.read_text()
+original_bytes=source.read_bytes()
+original=original_bytes.decode('utf-8')
 host=str(Path(sys.argv[1]).resolve())
 # Reintroduce the OS deadline in a portable valid C++ form.
 socket_timer='''\n#ifdef _WIN32
@@ -26,12 +27,12 @@ assert check().returncode==0,'baseline must pass'
 try:
     for name,before,after in cases:
         assert original.count(before)==1,('mutation anchor',name)
-        source.write_text(original.replace(before,after))
+        source.write_bytes(original.replace(before,after).encode('utf-8'))
         build()
         result=check()
         assert result.returncode!=0 and 'AssertionError' in result.stderr,('survived',name,result.stderr)
         print('CAUGHT hidden '+name+' bound',flush=True)
 finally:
-    source.write_text(original)
+    source.write_bytes(original_bytes)
     build()
 print('PASS 3 serve bound controls')

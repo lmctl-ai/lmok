@@ -41,6 +41,6 @@ class UnboundedServe(unittest.TestCase):
     def test_no_invisible_socket_deadline_policy(self):
         # Neither public surface declares a caller socket deadline. An OS socket
         # timer would bypass that contract even with idle_timeout_s set to zero.
-        source = (ROOT / 'cpp/serve.cpp').read_text()
+        source = (ROOT / 'cpp/serve.cpp').read_text(encoding='utf-8')
         self.assertIsNone(re.search(r'\bSO_(?:RCV|SND)TIMEO\b', source), 'undeclared OS socket deadline')
 if __name__ == '__main__': unittest.main()
