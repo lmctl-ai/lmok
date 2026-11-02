@@ -1438,7 +1438,7 @@ private:
           std::error_code e2;
           if (!it->is_regular_file(e2)) continue;
           auto size = it->file_size(e2);
-          auto mtime = it->last_write_time(e2).time_since_epoch().count();
+          const long long mtime = static_cast<long long>(it->last_write_time(e2).time_since_epoch().count()); // libc++ ticks are __int128
           lines.push_back(it->path().generic_u8string() + "|" + std::to_string(size) + "|" + std::to_string(mtime));
         }
         if (ec) return false;
