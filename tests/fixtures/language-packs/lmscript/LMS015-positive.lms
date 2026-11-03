@@ -1,0 +1,2 @@
+system(["lmctl", "script", "run.lms"]);
+system lmctl script run.lms;

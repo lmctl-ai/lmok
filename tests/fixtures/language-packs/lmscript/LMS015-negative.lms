@@ -1,0 +1,2 @@
+system(["lmctl", "script", "--check", "run.lms"]);
+system lmctl script --check run.lms;

@@ -1,0 +1,3 @@
+let result = 0;
+if (ready) { result = 1; }
+print(result);

@@ -1,0 +1,1 @@
+let program = dsl_cli("lmctl --dsl"); savedsl(program, "out.dslb");

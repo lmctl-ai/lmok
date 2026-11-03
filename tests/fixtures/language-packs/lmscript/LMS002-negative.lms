@@ -1,0 +1,1 @@
+let results = parallel([task_a, task_b]);

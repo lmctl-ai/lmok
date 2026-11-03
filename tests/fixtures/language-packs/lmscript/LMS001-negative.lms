@@ -1,0 +1,1 @@
+let choice = "no"; if (ready) { choice = "yes"; }

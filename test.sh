@@ -972,6 +972,8 @@ python3 tests/check-injections.py "$HOST" --prove-controls || fail "lmcode injec
 ok "lmcode injection across nested/multiple bodies, UTF-8, CRLF and splices"
 python3 tests/check-script-languages.py "$HOST" --prove-controls || fail "lmscript/lmcode grammar and facts oracles"
 ok "lmscript/lmcode parse, query, lint, facts and native output controls"
+python3 tests/check-language-rule-packs.py "$HOST" || fail "lmscript/lmcode rule-pack fixtures and mutation controls"
+ok "lmscript/lmcode migration packs: positive/negative fixtures, autofixes and config controls"
 python3 tests/check-java-os.py "$HOST" --prove-controls || fail "Java native OS oracles"
 ok "Java grammar, facts, tier-1 rules and annotated checks on native OS"
 

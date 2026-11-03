@@ -1,0 +1,126 @@
+{
+  "lang": "lmscript",
+  "rules": [
+    {
+      "id": "LMS001",
+      "on": "ternary_expression",
+      "message": "ternary expressions are not supported by lmscript; use if/else blocks",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS002",
+      "on": "call_expression",
+      "text_matches": "^parallel\\s*\\(\\s*[^\\x5B\\x2F\\x23\\x29]",
+      "message": "parallel requires a literal array; use parallel_map for generated inputs",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS003",
+      "query": "((for_statement (identifier) (identifier) @args) (#eq? @args \"ARGV\"))",
+      "capture": "args",
+      "message": "hand-parsed ARGV loop; use args_parse(ARGV, schema)",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS004",
+      "query": "((for_statement (identifier) (call_expression (identifier) @range (argument_list (number) (call_expression (identifier) @len (argument_list (identifier) @args))))) (#eq? @range \"range\") (#eq? @len \"len\") (#eq? @args \"ARGV\"))",
+      "capture": "args",
+      "message": "indexed ARGV loop; use args_parse(ARGV, schema)",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS005",
+      "query": "((call_expression (identifier) @outer (argument_list . (call_expression (identifier) @inner))) (#eq? @outer \"str\") (#eq? @inner \"get\"))",
+      "capture": "outer",
+      "message": "str(get(...)) loses typed access; use getstr/getnum/getbool/getlist and require",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS006",
+      "query": "((let_statement . (identifier) . (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((assignment_expression . (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((binary_expression (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((return_statement (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((if_statement (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((member_expression . (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((for_statement . (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((for_statement (identifier) (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\")) ((expression_statement . (identifier) @name) (#match? @name \"^(Provider[1-3]|Model[1-3])$\"))",
+      "capture": "name",
+      "message": "bare Provider/Model globals were removed; read the explicit PROPS.<provider>.Provider/ModelN path",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS007",
+      "on": "argument_list",
+      "text_matches": "(^|[,\\(\\[]\\s*)(Provider[1-3]|Model[1-3])\\s*(,|\\)|\\]|$)",
+      "message": "bare Provider/Model argument; use the explicit PROPS property",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS008",
+      "query": "(import_statement (plain_string) @path)",
+      "capture": "path",
+      "text_matches": "^\"native:",
+      "message": "native: imports were removed; import a local module or use the registered host API",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS009",
+      "query": "(import_statement (plain_string) @path)",
+      "capture": "path",
+      "text_matches": "^\"@[^/\"]+/[^\"]+\"$",
+      "message": "@owner module-store imports are retired; use a caller-relative module path",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS010",
+      "query": "(call_expression (identifier) @callee)",
+      "capture": "callee",
+      "text_matches": "^(savedsl|dsl_cli)$",
+      "message": "savedsl/dsl_cli bytecode plumbing is retired; use an executing lmcode block",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS011",
+      "query": "(marker_expression (block_marker) @marker)",
+      "capture": "marker",
+      "text_matches": "^_dsl_$",
+      "message": "_dsl_ is a retired alias; use _lmcode_ (update the matching end marker too)",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS012",
+      "query": "(system_call (list_literal (plain_string) @flag))",
+      "capture": "flag",
+      "text_matches": "^\"--dsl\"$",
+      "message": "--dsl is retired; use --lmcode",
+      "fix": "\"--lmcode\"",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS013",
+      "query": "(system_call (list_literal (plain_string) @flag))",
+      "capture": "flag",
+      "text_matches": "^\"--dsl-schema\"$",
+      "message": "--dsl-schema is retired; use --lmcode-schema",
+      "fix": "\"--lmcode-schema\"",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS014",
+      "query": "(system_call (list_literal (plain_string) @flag))",
+      "capture": "flag",
+      "text_matches": "^\"--dsl-signatures\"$",
+      "message": "--dsl-signatures is retired; use --lmcode-signatures",
+      "fix": "\"--lmcode-signatures\"",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS015",
+      "query": "((system_call (list_literal . (plain_string) @exe . (plain_string) @verb)) @call (#match? @exe \"lmctl\") (#match? @verb \"script\") (#not-match? @call \"--check\")) ((command) @call (#match? @call \"^system\\\\s+lmctl\\\\s+script\") (#not-match? @call \"--check\"))",
+      "capture": "call",
+      "message": "lmctl script invocation omits the required --check preflight",
+      "severity": "minor"
+    },
+    {
+      "id": "LMS016",
+      "query": "((source_file . (if_statement (identifier) (block (expression_statement (assignment_expression (identifier) @assigned)))) . (expression_statement (call_expression (identifier) (argument_list (identifier) @used))) (#eq? @assigned @used)))",
+      "capture": "used",
+      "message": "value first assigned in a branch is not visible afterward; declare it before the conditional",
+      "severity": "minor"
+    }
+  ]
+}

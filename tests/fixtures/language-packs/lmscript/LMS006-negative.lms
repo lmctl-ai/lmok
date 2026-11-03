@@ -1,0 +1,4 @@
+let provider = PROPS.Provider1.Provider;
+let model = PROPS.Provider1.Model2;
+let text = "value=" + PROPS.Provider1.Provider;
+consume(PROPS.Provider1.Model3);
