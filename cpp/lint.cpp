@@ -1,5 +1,6 @@
 // Rule-pack loading and the lint dispatcher; see lint.hpp for the contract.
 #include "lint.hpp"
+#include "lmscript_guards.hpp"
 #include "bounded_regex.hpp"
 #include "db.hpp"
 #include "input.hpp"
@@ -59,6 +60,7 @@ std::string expand_message(const std::string &message, const std::string &text) 
 }
 
 void maybe_emit(const LintRule &rule, const Node &node, std::vector<LintFinding> &findings, Suppression *suppression, bool no_suppress) {
+  if (!migration_guard(rule.guard,node)) return;
   const std::string text = node_text(node);
   try {
     if (!rule.text_matches.empty() && !regex_search_bounded(text, rule.text_regex)) return;
@@ -138,6 +140,12 @@ std::vector<LintRule> load_rule_pack(const std::string &path) {
       rule.on = on->text;
     }
     const JsonNode *query = member(entry, "query");
+    const JsonNode *guarded = member(entry, "guarded_query");
+    if(guarded){
+      if(query)fail("query and guarded_query are mutually exclusive");
+      if(!member(entry,"guard"))fail("guarded_query requires a structural guard");
+      query=guarded;
+    }
     if (query) {
       if (query->kind != JsonNode::Kind::String || query->text.empty()) fail("'query' must be a pattern string");
       rule.query = query->text;
@@ -191,6 +199,11 @@ std::vector<LintRule> load_rule_pack(const std::string &path) {
     } else {
       if (!pack_has_lang) fail("no language (set 'lang' at pack or rule level)");
       rule.grammar = pack_grammar;
+    }
+    if (const JsonNode *guard = member(entry, "guard")) {
+      const std::set<std::string> allowed={"unbound_identifier","computed_parallel","host_option","unchecked_lmctl_script"};
+      if(guard->kind!=JsonNode::Kind::String||!allowed.count(guard->text)||rule.grammar!=Grammar::Lmscript)fail("invalid lmscript structural guard");
+      rule.guard=guard->text;
     }
     if (const JsonNode *tm = member(entry, "text_matches")) {
       if (tm->kind != JsonNode::Kind::String || tm->text.empty())

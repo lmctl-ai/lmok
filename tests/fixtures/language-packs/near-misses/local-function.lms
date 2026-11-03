@@ -1,0 +1,1 @@
+fn savedsl(value){return value;}println(savedsl(7));

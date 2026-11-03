@@ -1,0 +1,1 @@
+fn use(Provider1,savedsl){println(Provider1);savedsl(7);}

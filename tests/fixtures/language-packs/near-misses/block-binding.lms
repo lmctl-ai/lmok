@@ -1,0 +1,1 @@
+if(true){let Model1="local";println(Model1);}println(Model1);

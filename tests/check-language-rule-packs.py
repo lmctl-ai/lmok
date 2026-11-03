@@ -74,6 +74,59 @@ with tempfile.TemporaryDirectory(prefix='language-packs-', dir=ROOT / 'build') a
             raise SystemExit(f'{rule} disabled-rule control survived: {control.stdout.decode(errors="replace")}{control.stderr.decode(errors="replace")}')
         print(f'PASS {rule}: positive, negative and disabled-rule control')
 
+    adversarial = {
+        "parallel-space.lms": set(), "parallel-comment.lms": set(),
+        "parallel-computed-comment.lms": {"LMS002"},
+        "local-globals.lms": set(), "local-function.lms": set(), "parameter-binding.lms": set(),
+        "block-binding.lms": {"LMS007"},
+        "printf-data.lms": set(), "delimited-data.lms": {"LMS015"}, "script-data.lms": set(), "option-data.lms": set(),
+        "command-substrings.lms": set(), "check-is-data.lms": {"LMS015"}, "exact-check.lms": set(),
+        "bare-command.lms": {"LMS015"}, "bare-command-checked.lms": set(),
+    }
+    for name, expected in adversarial.items():
+        fixture = FIXTURES / "near-misses" / name
+        result = lint(PACKS["lmscript"], fixture)
+        found = finding_rows(result.stdout)
+        actual = {row["rule"] for row in found}
+        if name == "block-binding.lms" and len(found) != 1:
+            raise SystemExit("block binding must suppress only the inner reference")
+        if result.returncode or actual != expected:
+            raise SystemExit(f"near-miss {name}: expected {expected}, got {actual}: {result.stderr.decode()}")
+        target = scratch / name
+        target.write_bytes(fixture.read_bytes())
+        fixed = lint(PACKS["lmscript"], target, "--fix")
+        if fixed.returncode or target.read_bytes() != fixture.read_bytes():
+            raise SystemExit("unsafe near-miss fix: " + name)
+        again = lint(PACKS["lmscript"], target, "--fix")
+        if again.returncode or target.read_bytes() != fixture.read_bytes():
+            raise SystemExit("nonidempotent near-miss fix: " + name)
+    for item in json.loads(PACKS['lmscript'].read_text())['rules']:
+        if 'guard' in item and ('guarded_query' not in item or 'query' in item):
+            raise SystemExit('guarded rule must fail closed on older runtimes')
+    host_positions = [
+        ('system(["lmscript","--check","--dsl-schema","schema.json"]);\n', '--dsl-schema', '--lmcode-schema'),
+        ('system(["/opt/bin/lmctl","script","--dsl","runner.lms"]);\n', '--dsl', '--lmcode'),
+        ('system(["lmctl.exe","--dsl-signatures","schema.json"]);\n', '--dsl-signatures', '--lmcode-signatures'),
+    ]
+    for index, (before, old, new) in enumerate(host_positions):
+        source = scratch / f'host-position-{index}.lms'
+        source.write_text(before)
+        result = lint(PACKS['lmscript'], source, '--fix')
+        expected = before.replace(old, new)
+        if result.returncode or source.read_text() != expected:
+            raise SystemExit('recognized host option not fixed: ' + before)
+        again = lint(PACKS['lmscript'], source, '--fix')
+        if again.returncode or source.read_text() != expected:
+            raise SystemExit('recognized option fix is not idempotent')
+    invalid = json.loads(PACKS['lmscript'].read_text())
+    invalid['rules'][0]['guard'] = 'typo-guard'
+    badpack = scratch / 'invalid-guard.json'
+    badpack.write_text(json.dumps(invalid))
+    refused = lint(badpack, FIXTURES / 'lmscript/LMS001-positive.lms')
+    if refused.returncode != 2 or b'invalid lmscript structural guard' not in refused.stderr:
+        raise SystemExit('unknown structural guard silently accepted')
+    print("PASS structural/binding/command near-misses and safe idempotent fixes")
+
     for rule, (before, after) in FIXES.items():
         source = scratch / f'{rule}-autofix.lms'
         source.write_text(before, encoding='utf-8')

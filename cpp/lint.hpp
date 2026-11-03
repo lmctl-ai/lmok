@@ -31,6 +31,7 @@ struct LintRule {
   std::string capture;     // pattern metavariable / query capture to report; empty = default candidates
   std::string pattern_inside, pattern_not_inside; // ancestor filters, also code-shaped; empty = not set
   CompiledPattern compiled, compiled_inside, compiled_not_inside;
+  std::string guard; // Optional validated structural refinement for lmscript migration rules.
   std::string message;     // "{text}" expands to the matched node's text
   std::optional<std::string> fix; // plain whole-node replacement; no metavariable expansion
   std::string severity = "minor"; // free-form; the pack owns the vocabulary
