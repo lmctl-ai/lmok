@@ -99,10 +99,10 @@ Three delivery forms, by how much logic a rule needs:
 
 ## Pack inventory
 
-Current main has **15 packs / 100 rule entries**. Counts are entries per pack,
+Current main has **17 packs / 117 rule entries**. Counts are entries per pack,
 not globally distinct IDs: secret checks intentionally recur across languages.
-The binary supports 11 languages; lmscript and lmcode have parsing/facts support
-but no shipped tier-1 JSON packs yet.
+The binary supports 11 languages; the lmscript/lmcode migration packs are the
+first shipped tier-1 JSON packs for these syntax-analysis grammars.
 
 | Pack | Language | Rules |
 | --- | --- | ---: |
@@ -114,6 +114,8 @@ but no shipped tier-1 JSON packs yet.
 | [java-tier1.json](java-tier1.json) | java | 9 |
 | [javascript-tier1.json](javascript-tier1.json) | javascript | 4 |
 | [json-tier1.json](json-tier1.json) | json | 11 |
+| [lmscript/modernization.json](lmscript/modernization.json) | lmscript | 16 |
+| [lmcode/modernization.json](lmcode/modernization.json) | lmcode | 1 |
 | [python-tier1.json](python-tier1.json) | python | 9 |
 | [secrets-bash.json](secrets-bash.json) | bash | 13 |
 | [secrets-c.json](secrets-c.json) | c | 7 |
@@ -129,6 +131,32 @@ JSON duplicate keys/values and object size, and Bash quoting checks. Secrets
 are heuristic, redacted shape checks; autofixes are deliberately narrow.
 `prefer-fstring.lms` reports string + `str(value)` + string concatenation
 boilerplate and suggests the compiler's single-line `f"...{value}..."` form.
+
+The `lmscript/modernization.json` and `lmcode/modernization.json` packs flag
+retired CLI/module forms and the lmcode string-concatenation idiom. The
+lmscript pack also covers the common `ARGV` loops, non-literal `parallel`
+inputs, untyped `str(get(...))`, retired Provider/Model globals, ternaries, and
+branch-local values used afterward. The branch-scope query is deliberately
+conservative: it flags a first top-level `if` assignment immediately read by a
+following call; it does not approximate whole-program dataflow.
+
+Configure both for repository CI in `.lmok/config.json`:
+
+```json
+{
+  "version": 1,
+  "packs": {
+    "lmscript": ["rules/lmscript/modernization.json"],
+    "lmcode": ["rules/lmcode/modernization.json"]
+  },
+  "severity_floor": "minor",
+  "fail_on": "findings"
+}
+```
+
+The exact literal fixes in LMS012–LMS014 update only retired `--dsl*` argv
+strings. Marker renames are not autofixed because `_dsl_` and `end _dsl_` must
+change as a pair; runner and import migrations need human review.
 
 ## Using an lmcode rule
 

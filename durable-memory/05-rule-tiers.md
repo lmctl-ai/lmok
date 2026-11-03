@@ -6,7 +6,7 @@ Membership test: "what information does the rule need?" — CST shape + text
 (tier 1, ship now as packs), CST + one named mechanical extension (tier 2,
 plan then build), real semantics (tier 3, defer).
 
-Current inventory: **11 languages**, **15 packs / 100 rule entries**, and
+Current inventory: **11 languages**, **17 packs / 117 rule entries**, and
 **14 lmcode programs**. See the [complete current table](../rules/README.md#pack-inventory).
 Milestone sections below describe their original scope, not a language limit.
 
