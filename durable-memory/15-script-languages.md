@@ -7,6 +7,11 @@ omit scanners: lmscript blocks/command literals and lmcode heredocs depend on
 external scanner state. No Tree-sitter generator or Node runtime is needed to
 run the installed binary.
 
+The lmcode grammar recognizes the compiler's single-line `f"...{expr}..."` strings,
+including nested ordinary expressions and doubled literal braces. The lmscript injection
+continues to parse only the outer block boundary; lmok parses the body with its pinned
+lmcode grammar, so formatted-string nodes retain absolute source coordinates.
+
 `--lang lmscript` selects the outer language; `.lms` inference selects it too.
 `--lang lmcode` selects standalone inner language; `.lmcode` is the local
 standalone convention. Existing `.lms` rule packs remain outer lmscript files,

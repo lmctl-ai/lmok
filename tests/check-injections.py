@@ -42,6 +42,10 @@ class Injections(unittest.TestCase):
     def test_query_selects_inner_grammar(self):
         self.assertEqual(self.run_host('query','--lang','lmcode','(function_declaration (identifier) @name)',self.path),
                          b'identifier 3:3-3:8\nidentifier 7:11-7:17\n')
+    def test_formatted_string_nodes_are_parsed_inside_injected_lmcode(self):
+        self.path.write_bytes(b'p = _lmcode_;\nlet text = f"hello {str(1)}";\nend _lmcode_\n')
+        self.assertEqual(self.run_host('query','--lang','lmcode','(formatted_string) @value',self.path),
+                         b'formatted_string 1:11-1:28\n')
     def test_line_shift_moves_findings_by_one(self):
         def locations():
             return [(r['name'],r['row'],r['col'],r['start_byte']) for r in self.facts() if r['kind']=='def.function']

@@ -26,5 +26,5 @@ tree_sitter_java.sha256=cb199e0faae4b2c08425f88cbb51c1a9319612e7b96315a174a624db
 tree_sitter_lmscript.url=https://github.com/lmctl-ai/tree-sitter-lmscript/archive/ff301218f388f30fcf40cd63d235070c162aa283.tar.gz
 tree_sitter_lmscript.sha256=a93b6fec40d6227d29ad7450e3ed9fdbd751b23adb3889d16a33f7470cb3a08a
 
-tree_sitter_lmcode.url=https://github.com/lmctl-ai/tree-sitter-lmcode/archive/c9d5021cc98982f558937298e4add9a4f79c574a.tar.gz
-tree_sitter_lmcode.sha256=a2e55961eed47c56c78d636d0a01ea2303576ac56638463a4ef1827d5a31d21a
+tree_sitter_lmcode.url=https://github.com/lmctl-ai/tree-sitter-lmcode/archive/24269b9770e910982d5cf134c03cd830f96ce97a.tar.gz
+tree_sitter_lmcode.sha256=462e2e806de25404d295c382f928236748e5bc72a820ca76beaca98cdd3aef14
