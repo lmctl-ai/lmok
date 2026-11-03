@@ -251,3 +251,22 @@ Python definitions do not satisfy C calls. This remains a name-set heuristic:
 static linkage, macros, conditional compilation, callbacks and external
 libraries beyond the whitelist are not resolved. An indexed definition with the
 same name can hide an unresolved call in a different scope or translation unit.
+
+### Migration pack refinements
+
+LMS001 is a **house policy** preferring if/else; current lmscript supports ternary syntax.
+LMS002 tests the argument CST, so whitespace/comments do not change whether an array is literal.
+LMS006/007/010 exclude explicit lexical let/const/function/parameter/loop/import bindings;
+they are not general runtime dataflow analysis. LMS012–014 autofix only proven literal
+lmctl/lmscript option positions before a script operand or `--`. Unknown option arity,
+dynamic argv, unrelated executables and payload strings are left untouched. LMS015 uses
+exact executable/verb/check tokens; a check-looking payload does not count as validation.
+The pack expresses these refinements with validated lmscript-only `guard` values:
+`unbound_identifier`, `computed_parallel`, `host_option`, `unchecked_lmctl_script`.
+Unknown guard names or non-lmscript use are errors, never silently ignored.
+
+Guarded selectors use `guarded_query`, not `query`. A pre-guard runtime therefore
+rejects the pack before linting or fixing instead of silently ignoring a safety
+condition. Upgrade the host together with the current pack. Guarded queries need
+an explicit supported `guard` and are lmscript-only; their CST capture semantics
+are the same as ordinary queries.
