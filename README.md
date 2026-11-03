@@ -10,7 +10,7 @@ lmcode bodies in `.lms` files are parsed separately with absolute source positio
 No Node runtime is needed to run the standalone binary.
 
 - Parse/query source, extract facts, measure local metrics and token duplication.
-- Lint with **15 JSON packs (100 rule entries)** and **15 lmcode rule programs**;
+- Lint with **15 JSON packs (100 rule entries)** and **16 lmcode rule programs**;
   see the [complete pack inventory](rules/README.md#pack-inventory).
 - Build a local SQLite knowledge tree with `index`, `symbols`, `refs`,
   `findings` and `status`; `facts` also exports records without a DB.
@@ -553,7 +553,7 @@ packs (C, JSON, Python, Bash, Java, Go, JavaScript, TypeScript and TSX), four
 secrets packs (Bash, C, JSON, Python), and two autofix packs (Bash, C).
 See the [complete filename/count table](rules/README.md#pack-inventory).
 lmscript and lmcode have parsing/facts support but no shipped JSON pack.
-The **15 lmcode-native**
+The **16 lmcode-native**
 rules in `rules/lmcode/` cover checks that need logic (function metrics, switch/if style, duplicate JSON
 keys and sibling string values, object size, nesting depth via `Node.has_parent()`/`parent()`, scanf width via
 query predicates, same-file symbol rules via set algebra, indexed repository-wide

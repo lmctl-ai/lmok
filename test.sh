@@ -543,7 +543,8 @@ for f in c-function-metrics c-switch-style json-duplicate-values json-duplicate-
   grep -qxF '[]' <<<"$out" || fail "$f clean fixture findings: $out"
   grep -qx '0 findings\( in .*\)\?' <<<"$out" || fail "$f clean fixture count: $out"
 done
-ok "rules/lmcode: ten rule files fire on violations fixtures, silent on clean"
+python3 tests/check-fstring-suggestion.py "$HOST" || fail "f-string suggestion and disabled-predicate control"
+ok "rules/lmcode: existing rules plus f-string suggestion and mutation control"
 
 # --- incremental reparse contract (E5) ---
 cat > "$WORK/reparse-contract.lms" <<EOF2
@@ -979,7 +980,7 @@ python3 tests/check-patterns.py "$HOST" || fail "pattern compiler cases"
 ok "patterns: code-shaped patterns compile to pinned queries; root matches and exit-2 diagnostics byte-exact"
 ok "native OS byte/path/linkage contracts and negative controls"
 python3 tests/check-rules-os.py "$HOST" --prove-controls || fail "rule pack OS oracles"
-ok "rule packs per OS: all fifteen lmcode programs, CRLF/no-newline/unicode fixtures, anonymous kinds, argument order"
+ok "rule packs per OS: all sixteen lmcode programs, CRLF/no-newline/unicode fixtures, anonymous kinds, argument order"
 # --- SQLite DB layer (keep additive checks at the end) ---
 cmake --build "$BUILD_DIR" --target lmok_db_test -j2 >"$WORK/db-build.log" 2>&1 ||
   { cat "$WORK/db-build.log" >&2; fail "DB wrapper test build"; }

@@ -122,11 +122,13 @@ but no shipped tier-1 JSON packs yet.
 | [tsx-tier1.json](tsx-tier1.json) | tsx | 3 |
 | [typescript-tier1.json](typescript-tier1.json) | typescript | 3 |
 
-The **15 lmcode programs** add function metrics, C/Python cognitive complexity,
+The **16 lmcode programs** add function metrics, C/Python cognitive complexity,
 switch/branch style, nesting, scanf-width checks, same-/cross-file and indexed
 repository-wide symbol sets,
 JSON duplicate keys/values and object size, and Bash quoting checks. Secrets
 are heuristic, redacted shape checks; autofixes are deliberately narrow.
+`prefer-fstring.lms` reports string + `str(value)` + string concatenation
+boilerplate and suggests the compiler's single-line `f"...{value}..."` form.
 
 ## Using an lmcode rule
 
@@ -154,7 +156,7 @@ Expect LBC101 and LBC102 findings, `2 findings in tests/fixtures/c-logic-violati
 and a terminal `LMCODE_RETURN_BEGIN` / JSON envelope / `LMCODE_RETURN_END` frame.
 Output directories must exist before fixture export.
 
-Run all 15 rule programs against their fixtures:
+Run all 16 rule programs against their fixtures:
 
 ```sh
 for source in rules/lmcode/*.lms; do

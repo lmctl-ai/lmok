@@ -76,7 +76,7 @@ class RulePacksOS(unittest.TestCase):
         # dispatches natively: violations fixture yields N>0 findings with the
         # full finding shape, and the count line matches the array length.
         packs = sorted((ROOT / 'rules/lmcode').glob('*.lms'))
-        self.assertEqual(len(packs), 15, packs)  # a new pack must be wired in here by glob, so pin the count
+        self.assertEqual(len(packs), 16, packs)  # a new pack must be wired in here by glob, so pin the count
         for pack in packs:
             with self.subTest(pack=pack.name):
                 header = [line[9:].split() for line in pack.read_text().splitlines() if line.startswith('# check: ')]

@@ -1,0 +1,39 @@
+# Chapter: Rules (lmcode) - prefer formatted strings for conversion concatenation
+# Shows: binary_expression child inspection and a compile-time f-string suggestion
+# Run: node scripts/compile-fixture.mjs rules/lmcode/prefer-fstring.lms build/rules-lmcode/prefer-fstring.dslb
+# check: lmcode tests/fixtures/fstring-concat.lmcode
+# exit: 0
+# expect:
+#|[{"row":1,"col":14,"end_row":1,"end_col":47,"rule":"LBC120","severity":"minor","message":"prefer an f-string for string + str(value) + string"}]
+#|1 findings in tests/fixtures/fstring-concat.lmcode
+p = _lmcode_ cli="lmok";
+
+fn is_str_call(n: Node) -> bool {
+  let matches = false;
+  if (n.kind() == "call_expression" && n.child_count() == 2) {
+    let function = n.child(0);
+    let args = n.child(1);
+    matches = function.text() == "str" && args.kind() == "argument_list" && args.child_count() == 1;
+  }
+  return matches;
+}
+
+@binary_expression
+fn suggest_formatted_string(n: Node) -> void implements Rule {
+  if (n.child_count() == 2) {
+    let left = n.child(0);
+    let suffix = n.child(1);
+    if (left.kind() == "binary_expression" && suffix.kind() == "string" && left.child_count() == 2) {
+      let prefix = left.child(0);
+      let conversion = left.child(1);
+      if (prefix.kind() == "string" && is_str_call(conversion)) {
+        ts.report(n, "prefer an f-string for string + str(value) + string", "LBC120", "minor");
+      }
+    }
+  }
+}
+
+end _lmcode_
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");

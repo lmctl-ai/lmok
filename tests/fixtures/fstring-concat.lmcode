@@ -1,0 +1,4 @@
+let count = 7;
+let message = "before " + str(count) + " after";
+let suffix_only = str(count) + " after";
+let no_conversion = "before " + count + " after";
