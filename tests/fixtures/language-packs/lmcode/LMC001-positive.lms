@@ -1,1 +1,3 @@
+p = _lmcode_ schema="unused.json";
 let name = "Ada"; let text = "hello " + str(name) + "!";
+end _lmcode_

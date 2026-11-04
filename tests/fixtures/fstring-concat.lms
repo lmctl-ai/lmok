@@ -1,0 +1,6 @@
+p = _lmcode_ schema="unused.json";
+let count = 7;
+let message = "before " + str(count) + " after";
+let suffix_only = str(count) + " after";
+let no_conversion = "before " + count + " after";
+end _lmcode_

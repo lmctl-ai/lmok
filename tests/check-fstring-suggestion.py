@@ -12,7 +12,7 @@ COMPILER = os.environ.get('LMSCRIPT_BIN')
 if not COMPILER:
     raise SystemExit('LMSCRIPT_BIN must select the private source compiler')
 RULE = ROOT / 'rules/lmcode/prefer-fstring.lms'
-FIXTURE = ROOT / 'tests/fixtures/fstring-concat.lmcode'
+FIXTURE = ROOT / 'tests/fixtures/fstring-concat.lms'
 EXPECTED = '"rule":"LBC120"'
 NEEDLE = 'if (prefix.kind() == "string" && is_str_call(conversion)) {'
 
@@ -24,8 +24,8 @@ def compile_rule(source: Path, output: Path) -> None:
         raise SystemExit('rule compilation failed: ' + result.stderr.decode(errors='replace'))
 
 
-def lint(bytecode: Path) -> str:
-    result = subprocess.run([str(HOST), 'check', '--lang', 'lmcode', str(bytecode), str(FIXTURE)],
+def lint(bytecode: Path, fixture: Path = FIXTURE) -> str:
+    result = subprocess.run([str(HOST), 'check', '--lang', 'lmcode', str(bytecode), str(fixture)],
                             cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
         raise SystemExit('rule check failed: ' + result.stderr + result.stdout)
@@ -40,6 +40,9 @@ with tempfile.TemporaryDirectory(prefix='fstring-suggestion-', dir=ROOT / 'build
     if EXPECTED not in output or '1 findings in ' not in output:
         raise SystemExit('f-string suggestion missing from control fixture: ' + output)
 
+    standalone=lint(normal,ROOT/'tests/fixtures/fstring-concat.lmcode')
+    if EXPECTED in standalone or '0 findings in ' not in standalone: raise SystemExit('LBC120 leaked into standalone lmcode: '+standalone)
+
     source = RULE.read_text(encoding='utf-8')
     if source.count(NEEDLE) != 1:
         raise SystemExit('mutation anchor changed')
@@ -50,4 +53,10 @@ with tempfile.TemporaryDirectory(prefix='fstring-suggestion-', dir=ROOT / 'build
     changed = lint(mutant_binary)
     if EXPECTED in changed or '0 findings in ' not in changed:
         raise SystemExit('disabled-rule control was not caught: ' + changed)
-    print('PASS f-string suggestion; CAUGHT disabled-predicate control')
+    scope = scratch / 'scope-mutant.lms'
+    scope.write_text(source.replace('in_lmscript_body(n) && ', '', 1), encoding='utf-8')
+    scope_binary = scratch / 'scope.dslb'
+    compile_rule(scope, scope_binary)
+    leaked = lint(scope_binary, ROOT / 'tests/fixtures/fstring-concat.lmcode')
+    if EXPECTED not in leaked: raise SystemExit('removed-scope control did not reproduce standalone advice')
+    print('PASS body-only f-string suggestion; CAUGHT disabled-predicate and removed-scope controls')

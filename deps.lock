@@ -23,8 +23,8 @@ sqlite.sha256=0a9c8e34352dad46006aa82836d5383bff9dc6bc9ce5a60553c05aa30e6ad1f9
 tree_sitter_java.url=https://github.com/tree-sitter/tree-sitter-java/archive/refs/tags/v0.23.5.tar.gz
 tree_sitter_java.sha256=cb199e0faae4b2c08425f88cbb51c1a9319612e7b96315a174a624db9bf3d9f0
 
-tree_sitter_lmscript.url=https://github.com/lmctl-ai/tree-sitter-lmscript/archive/ff301218f388f30fcf40cd63d235070c162aa283.tar.gz
-tree_sitter_lmscript.sha256=a93b6fec40d6227d29ad7450e3ed9fdbd751b23adb3889d16a33f7470cb3a08a
+tree_sitter_lmscript.url=https://github.com/lmctl-ai/tree-sitter-lmscript/archive/268fb894c981041bfed0233b6320178e100410e4.tar.gz
+tree_sitter_lmscript.sha256=fac15f47102dfb35e2521c00db5bb8d08d61f3288f618813abb0f8cc13ada1c1
 
-tree_sitter_lmcode.url=https://github.com/lmctl-ai/tree-sitter-lmcode/archive/24269b9770e910982d5cf134c03cd830f96ce97a.tar.gz
-tree_sitter_lmcode.sha256=462e2e806de25404d295c382f928236748e5bc72a820ca76beaca98cdd3aef14
+tree_sitter_lmcode.url=https://github.com/lmctl-ai/tree-sitter-lmcode/archive/f7937605db4a07464a333d4ca900090b09baa44a.tar.gz
+tree_sitter_lmcode.sha256=337d26b184039da97f9d0163b96dfb9f5585a632ecd7577fd0685f35fec97a65

@@ -4,8 +4,9 @@
     {
       "id": "LMC001",
       "query": "((binary_expression left: (binary_expression left: (string) right: (call_expression function: (identifier) @convert)) right: (string)) (#eq? @convert \"str\"))",
-      "message": "string + str(value) + string is clearer as an lmcode f-string",
-      "severity": "minor"
+      "message": "in lmscript bodies, prefer an f-string for string + str(value) + string",
+      "severity": "minor",
+      "guard": "lmscript_body"
     }
   ]
 }

@@ -25,6 +25,7 @@ extern "C" const TSLanguage *tree_sitter_tsx(void);
 
 extern "C" const TSLanguage *tree_sitter_lmscript(void);
 extern "C" const TSLanguage *tree_sitter_lmcode(void);
+extern "C" const TSLanguage *tree_sitter_lmscript_lmcode(void);
 
 namespace lmok {
 
@@ -41,6 +42,7 @@ static const TSLanguage *language_of(Grammar grammar) {
   case Grammar::Tsx: return tree_sitter_tsx();
   case Grammar::Lmscript: return tree_sitter_lmscript();
   case Grammar::Lmcode: return tree_sitter_lmcode();
+  case Grammar::LmcodeBody: return tree_sitter_lmscript_lmcode();
   }
   return tree_sitter_json();
 }
@@ -98,6 +100,7 @@ const char *grammar_name(Grammar grammar) {
   case Grammar::Tsx: return "tsx";
   case Grammar::Lmscript: return "lmscript";
   case Grammar::Lmcode: return "lmcode";
+  case Grammar::LmcodeBody: return "lmscript_lmcode";
   }
   return "json";
 }
@@ -149,7 +152,7 @@ Tree parse_range(Grammar grammar, const Node &body) {
 std::vector<Tree> lmcode_injections(const Tree &outer) {
   std::vector<Tree> trees;
   for(const auto &node:tree_nodes(outer).items)
-    if(node_kind(node)=="lmcode_body")trees.push_back(parse_range(Grammar::Lmcode,node));
+    if(node_kind(node)=="lmcode_body")trees.push_back(parse_range(Grammar::LmcodeBody,node));
   return trees;
 }
 
@@ -599,7 +602,9 @@ static void run_query(const Node &root_node, const std::string &pattern, Grammar
   }
   uint32_t error_offset = 0;
   TSQueryError error_type = TSQueryErrorNone;
-  RaiiQuery query{ts_query_new(language_of(grammar), pattern.data(),
+  const TSLanguage *query_language=language_of(grammar);
+  if(grammar==Grammar::Lmcode && ts_node_language(ts(root_node))==tree_sitter_lmscript_lmcode())query_language=tree_sitter_lmscript_lmcode();
+  RaiiQuery query{ts_query_new(query_language, pattern.data(),
                                static_cast<uint32_t>(pattern.size()), &error_offset, &error_type)};
   if (!query.q)
     throw QueryError("query error at byte offset " + std::to_string(error_offset) +

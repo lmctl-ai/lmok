@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix='language-packs-', dir=ROOT / 'build') a
     scratch = Path(temp)
     for rule, lang in RULE_LANG.items():
         pack = PACKS[lang]
-        ext = '.lmcode' if lang == 'lmcode' else '.lms'
+        ext = '.lms'
         positive = FIXTURES / lang / f'{rule}-positive{ext}'
         negative = FIXTURES / lang / f'{rule}-negative{ext}'
         for path in (positive, negative):
@@ -145,6 +145,17 @@ with tempfile.TemporaryDirectory(prefix='language-packs-', dir=ROOT / 'build') a
             raise SystemExit(f'{rule} autofix-disabled control failed: {control.stderr.decode(errors="replace")}')
         print(f'PASS {rule}: exact autofix and disabled-fix control')
 
+    # The lmcode modernization advice belongs only to an injected lmscript body.
+    plain = scratch / 'standalone.lmcode'
+    plain.write_text('let n=7; let text="value="+str(n)+"!";\n')
+    result = lint(PACKS['lmcode'], plain)
+    if result.returncode or finding_rows(result.stdout): raise SystemExit('body-only pack leaked into standalone lmcode')
+    data = json.loads(PACKS['lmcode'].read_text())
+    data['rules'][0].pop('guard')
+    unguarded = scratch / 'unguarded.json'
+    unguarded.write_text(json.dumps(data))
+    if 'LMC001' not in [r['rule'] for r in finding_rows(lint(unguarded, plain).stdout)]: raise SystemExit('removed-context guard control failed')
+
     # Exercise both new packs through the documented root-relative project config.
     project = scratch / 'project'
     (project / '.lmok').mkdir(parents=True)
@@ -154,7 +165,7 @@ with tempfile.TemporaryDirectory(prefix='language-packs-', dir=ROOT / 'build') a
     shutil.copyfile(PACKS['lmscript'], project / 'rules/lmscript/modernization.json')
     shutil.copyfile(PACKS['lmcode'], project / 'rules/lmcode/modernization.json')
     shutil.copyfile(FIXTURES / 'lmscript/LMS012-positive.lms', project / 'src/legacy.lms')
-    shutil.copyfile(FIXTURES / 'lmcode/LMC001-positive.lmcode', project / 'src/fstring.lmcode')
+    shutil.copyfile(FIXTURES / 'lmcode/LMC001-positive.lms', project / 'src/fstring.lms')
     config = {'version': 1,
               'packs': {'lmscript': ['rules/lmscript/modernization.json'],
                         'lmcode': ['rules/lmcode/modernization.json']},

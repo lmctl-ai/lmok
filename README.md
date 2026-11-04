@@ -902,3 +902,10 @@ The documentation calls the language lmcode. `--lmcode`, `--lmcode-schema` and `
 first-line signatures and scopes grouped by file. An available DB ranks
 files by reference-name occurrence counts; otherwise paths determine order.
 The line budget keeps whole file blocks. See [the output contract](docs/tier3/outline.md).
+
+Formatted strings are lmscript body syntax. Standalone lmcode is parsed with the
+plain grammar; injected `_lmcode_` bodies use the pinned lmscript-owned companion.
+LBC120 and the LMC001 modernization-pack advice apply only inside those bodies,
+identified structurally by the companion's `lmscript_lmcode_body` ancestor. They
+never recommend unavailable syntax for standalone `.lmcode` files. Source ranges
+remain absolute, including CRLF and Unicode inputs; no schema/VM change is needed.

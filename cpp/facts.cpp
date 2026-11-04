@@ -42,6 +42,7 @@ const std::string &facts_query(Grammar grammar) {
   case Grammar::Tsx: return tsx;
   case Grammar::Lmscript: return lmscript;
   case Grammar::Lmcode: return lmcode;
+  case Grammar::LmcodeBody: return lmcode;
   }
   return json;
 }

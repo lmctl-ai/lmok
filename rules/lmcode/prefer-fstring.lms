@@ -1,11 +1,11 @@
-# Chapter: Rules (lmcode) - prefer formatted strings for conversion concatenation
+# Chapter: Rules (lmscript bodies) - prefer formatted strings for conversion concatenation
 # Shows: binary_expression child inspection and a compile-time f-string suggestion
 # Run: node scripts/compile-fixture.mjs rules/lmcode/prefer-fstring.lms build/rules-lmcode/prefer-fstring.dslb
-# check: lmcode tests/fixtures/fstring-concat.lmcode
+# check: lmcode tests/fixtures/fstring-concat.lms
 # exit: 0
 # expect:
-#|[{"row":1,"col":14,"end_row":1,"end_col":47,"rule":"LBC120","severity":"minor","message":"prefer an f-string for string + str(value) + string"}]
-#|1 findings in tests/fixtures/fstring-concat.lmcode
+#|[{"row":2,"col":14,"end_row":2,"end_col":47,"rule":"LBC120","severity":"minor","message":"prefer an f-string for string + str(value) + string"}]
+#|1 findings in tests/fixtures/fstring-concat.lms
 p = _lmcode_ cli="lmok";
 
 fn is_str_call(n: Node) -> bool {
@@ -18,9 +18,19 @@ fn is_str_call(n: Node) -> bool {
   return matches;
 }
 
+fn in_lmscript_body(node: Node) -> bool {
+  let cur = node;
+  let found = false;
+  while (cur.has_parent()) {
+    cur = cur.parent();
+    if (cur.kind() == "lmscript_lmcode_body") { found = true; }
+  }
+  return found;
+}
+
 @binary_expression
 fn suggest_formatted_string(n: Node) -> void implements Rule {
-  if (n.child_count() == 2) {
+  if (in_lmscript_body(n) && n.child_count() == 2) {
     let left = n.child(0);
     let suffix = n.child(1);
     if (left.kind() == "binary_expression" && suffix.kind() == "string" && left.child_count() == 2) {

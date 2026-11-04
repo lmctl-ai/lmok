@@ -202,7 +202,7 @@ std::vector<LintRule> load_rule_pack(const std::string &path) {
     }
     if (const JsonNode *guard = member(entry, "guard")) {
       const std::set<std::string> allowed={"unbound_identifier","computed_parallel","host_option","unchecked_lmctl_script"};
-      if(guard->kind!=JsonNode::Kind::String||!allowed.count(guard->text)||rule.grammar!=Grammar::Lmscript)fail("invalid lmscript structural guard");
+      if(guard->kind!=JsonNode::Kind::String||!((allowed.count(guard->text)&&rule.grammar==Grammar::Lmscript)||(guard->text=="lmscript_body"&&rule.grammar==Grammar::Lmcode)))fail("invalid lmscript structural guard");
       rule.guard=guard->text;
     }
     if (const JsonNode *tm = member(entry, "text_matches")) {

@@ -21,7 +21,7 @@ struct Node;
 // The vendored grammars. The DSL surface is explicit per grammar
 // (ts.parse / ts.parse_c / ts.parse_python / ts.parse_bash, same for query and
 // reparse). CLI grammar selection is language-parameterized separately.
-enum class Grammar { Json, C, Python, Bash, Java, Go, Javascript, Typescript, Tsx, Lmscript, Lmcode };
+enum class Grammar { Json, C, Python, Bash, Java, Go, Javascript, Typescript, Tsx, Lmscript, Lmcode, LmcodeBody };
 const char *grammar_name(Grammar grammar); // stable lower-case CLI language name
 // Empty when `kind` is a kind the walk can visit in this grammar (a named node, an anonymous token or ERROR);
 // otherwise the reason it can never match: unknown spelling, a supertype (abstract; annotate its concrete

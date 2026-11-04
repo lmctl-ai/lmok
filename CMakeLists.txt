@@ -37,6 +37,8 @@ set(TSLMC_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tree-sitter-lmcode")
 set(TS_SOURCES
   "${TSLMS_ROOT}/src/parser.c"
   "${TSLMS_ROOT}/src/scanner.c"
+  "${TSLMS_ROOT}/lmcode-body/src/parser.c"
+  "${TSLMS_ROOT}/lmcode-body/src/scanner.c"
   "${TSLMC_ROOT}/src/parser.c"
   "${TSLMC_ROOT}/src/scanner.c"
   "${TSJAVA_ROOT}/src/parser.c"

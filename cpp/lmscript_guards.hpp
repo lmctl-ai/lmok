@@ -60,6 +60,7 @@ inline std::optional<std::vector<std::string>> migration_argv(const Node& call){
 inline std::optional<Node> migration_system(const Node& n){Node cur=n;for(;;){if(node_kind(cur)=="system_call"||node_kind(cur)=="command")return cur;if(!node_has_parent(cur))return std::nullopt;cur=node_parent(cur);}}
 inline bool migration_guard(const std::string& guard,const Node& n){
  if(guard.empty())return true;
+ if(guard=="lmscript_body"){Node cur=n;for(;;){if(node_kind(cur)=="lmscript_lmcode_body")return true;if(!node_has_parent(cur))return false;cur=node_parent(cur);}}
  if(guard=="unbound_identifier")return !migration_bound(n);
  if(guard=="computed_parallel"){const auto args=migration_children(n);return args.empty()||node_kind(args[0])!="list_literal";}
  const auto call=migration_system(n);if(!call)return false;const auto parsed=migration_argv(*call);if(!parsed||parsed->empty())return false;const auto& argv=*parsed;const auto exe=migration_executable(argv[0]);
