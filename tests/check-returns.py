@@ -32,7 +32,7 @@ class ReturnChecks(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         fixtures = ROOT / "tests/fixtures/returns"
-        for line in (fixtures / "fixtures.lock").read_text().splitlines():
+        for line in (fixtures / "fixtures.lock").read_text(encoding='utf-8').splitlines():
             digest, name = line.split("  ")
             assert hashlib.sha256((fixtures / name).read_bytes()).hexdigest() == digest, name
         schema_hash = hashlib.sha256((ROOT / "schema/lmok.dsl.json").read_bytes()).digest()
@@ -55,7 +55,7 @@ class ReturnChecks(unittest.TestCase):
             + "",
             encoding="utf-8", newline="\n",
         )
-        result = subprocess.run(["node", str(ROOT/"scripts/compile-fixture.mjs"), str(source), str(bytecode)], capture_output=True, text=True)
+        result = subprocess.run(["node", str(ROOT/"scripts/compile-fixture.mjs"), str(source), str(bytecode)], capture_output=True, text=True, encoding='utf-8', errors='replace')
         self.assertEqual(result.returncode, 0, result.stderr)
         return bytecode
 

@@ -23,6 +23,7 @@ Repository: https://github.com/lmctl-ai/lmok.
 | [12-autofix.md](12-autofix.md) | Whole-node fix metadata, verified edits and unified previews |
 | [13-baseline-sarif.md](13-baseline-sarif.md) | lint --new-since/--baseline/--changed/--fail-on-new keying, findings.snippet column, host --sarif on lint/check/ci |
 | [16-review-mainline-wave.md](16-review-mainline-wave.md) | Independent review of the bef3003..065a833 wave: index-after-lint fix, --changed hardening, bootstrap publish, import bindings, L notes |
+| [17-sdk-sync-and-flag-sweep.md](17-sdk-sync-and-flag-sweep.md) | SDK at lmcode-cpp origin/main, retired-flag sweep scope (rules/fixtures keep them), utf-8 test I/O, shared compiler probe |
 | [11-metrics.md](11-metrics.md) | Local metrics, token duplication and C/Python cognitive complexity |
 | [12-rule-contracts.md](12-rule-contracts.md) | Rule metadata and annotated pack-author tests |
 | [12-secrets-packs.md](12-secrets-packs.md) | Secret shapes, contextual entropy, redaction and limits |

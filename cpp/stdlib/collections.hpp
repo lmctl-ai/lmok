@@ -8,6 +8,7 @@
 #endif
 #include <algorithm>
 #include <deque>
+#include <limits>
 #include <utility>
 #include <vector>
 #include <unordered_map>
@@ -91,22 +92,26 @@ struct Collections {
   std::deque<IntList> int_lists;
   std::deque<FloatList> float_lists;
   std::deque<StrMap> str_maps;
-  size_t size() const { return objects.size() + str_lists.size() + int_lists.size() + float_lists.size() + str_maps.size(); }
-  void reset() { objects.clear(); str_lists.clear(); int_lists.clear(); float_lists.clear(); str_maps.clear(); }
-  void reserve_object(const char* type) const {
-    if (size() >= 65536) throw Error(std::string(type) + " object limit exceeded (65536)");
+  size_t size() const {
+    size_t total = 0;
+    const size_t max_size = std::numeric_limits<size_t>::max();
+    for (size_t count : {objects.size(), str_lists.size(), int_lists.size(), float_lists.size(), str_maps.size()}) {
+      if (count > max_size - total) throw Error("collection object count exceeds size_t capacity");
+      total += count;
+    }
+    return total;
   }
-  template<class T, class... Args> T* make_object(const char* type, Args&&... args) {
-    reserve_object(type);
+  void reset() { objects.clear(); str_lists.clear(); int_lists.clear(); float_lists.clear(); str_maps.clear(); }
+  template<class T, class... Args> T* make_object(const char*, Args&&... args) try {
     auto value = std::make_shared<T>(std::forward<Args>(args)...);
     auto* pointer = value.get();
     objects.push_back(std::move(value));
     return pointer;
-  }
-  StrList* make_str_list(std::vector<std::string> values = {}) { reserve_object("StrList"); str_lists.push_back({std::move(values)}); return &str_lists.back(); }
-  IntList* make_int_list(std::vector<int64_t> values = {}) { reserve_object("IntList"); int_lists.push_back({std::move(values)}); return &int_lists.back(); }
-  FloatList* make_float_list(std::vector<double> values = {}) { reserve_object("FloatList"); float_lists.push_back({std::move(values)}); return &float_lists.back(); }
-  StrMap* make_str_map() { reserve_object("StrMap"); str_maps.emplace_back(); return &str_maps.back(); }
+  } catch (const std::bad_alloc&) { throw Error("collection allocation failed"); } catch (const std::length_error&) { throw Error("collection allocation exceeds platform capacity"); }
+  StrList* make_str_list(std::vector<std::string> values = {}) try { str_lists.push_back({std::move(values)}); return &str_lists.back(); } catch (const std::bad_alloc&) { throw Error("collection allocation failed"); } catch (const std::length_error&) { throw Error("collection allocation exceeds platform capacity"); }
+  IntList* make_int_list(std::vector<int64_t> values = {}) try { int_lists.push_back({std::move(values)}); return &int_lists.back(); } catch (const std::bad_alloc&) { throw Error("collection allocation failed"); } catch (const std::length_error&) { throw Error("collection allocation exceeds platform capacity"); }
+  FloatList* make_float_list(std::vector<double> values = {}) try { float_lists.push_back({std::move(values)}); return &float_lists.back(); } catch (const std::bad_alloc&) { throw Error("collection allocation failed"); } catch (const std::length_error&) { throw Error("collection allocation exceeds platform capacity"); }
+  StrMap* make_str_map() try { str_maps.emplace_back(); return &str_maps.back(); } catch (const std::bad_alloc&) { throw Error("collection allocation failed"); } catch (const std::length_error&) { throw Error("collection allocation exceeds platform capacity"); }
 };
 
 namespace detail {
@@ -169,7 +174,6 @@ inline Registry& register_collections(Registry& r, Collections& arena) {
   pure_std_function(r, "str_map", {}, "StrMap", [&arena](Args&) { return Value::object("StrMap", arena.make_str_map()); });
   pure_std_function(r, "str_split", {"string", "string"}, "StrList", [&arena](Args& a) {
     if (a[1].s.empty()) throw Error("str_split: separator must not be empty");
-    arena.reserve_object("StrList");
     std::vector<std::string> items; size_t at = 0, found;
     while ((found = a[0].s.find(a[1].s, at)) != std::string::npos) { items.push_back(a[0].s.substr(at, found - at)); at = found + a[1].s.size(); }
     items.push_back(a[0].s.substr(at)); return Value::object("StrList", arena.make_str_list(std::move(items)));

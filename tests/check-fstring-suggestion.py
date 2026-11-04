@@ -26,7 +26,7 @@ def compile_rule(source: Path, output: Path) -> None:
 
 def lint(bytecode: Path, fixture: Path = FIXTURE) -> str:
     result = subprocess.run([str(HOST), 'check', '--lang', 'lmcode', str(bytecode), str(fixture)],
-                            cwd=ROOT, capture_output=True, text=True)
+                            cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode:
         raise SystemExit('rule check failed: ' + result.stderr + result.stdout)
     return result.stdout

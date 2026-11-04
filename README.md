@@ -85,8 +85,8 @@ release tag for reproducibility. The five assets are `lmok-linux-x64`,
 `lmok-linux-arm64`, `lmok-macos-x64`, `lmok-macos-arm64`, and
 `lmok-windows-x64.exe`, plus `SHA256SUMS`.
 
-**Compatibility:** the verified v0.6.11 and dist hosts expose `--dsl`,
-`--dsl-schema` and `--dsl-signatures`. Current main exposes only `--lmcode`,
+**Compatibility:** the verified v0.6.11 and dist hosts speak the retired
+flag family; current main answers only `--lmcode`,
 `--lmcode-schema` and `--lmcode-signatures`. Use the source-built host with
 main's pinned compiler and scripts; installing the latest release alone is
 not a substitute. The native parsing, linting and DB journeys were verified on both snapshots.

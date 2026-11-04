@@ -203,7 +203,7 @@ class NativeOS(unittest.TestCase):
         self.exact(self.run_host('query', '(number) @n', source), expected)
         self.exact(self.run_host('query', '(number) @n', '-', data=payload), expected)
     def test_metadata_and_executable(self):
-        version = re.search(r'^project\(lmok VERSION ([0-9.]+)', (ROOT / 'CMakeLists.txt').read_text(), re.M).group(1)
+        version = re.search(r'^project\(lmok VERSION ([0-9.]+)', (ROOT / 'CMakeLists.txt').read_text(encoding='utf-8'), re.M).group(1)
         expected = ('lmok ' + version + '\n').encode()
         self.exact(self.run_host('--version'), expected)
         copied = self.work / ('copied tool.exe' if os.name == 'nt' else 'copied tool')
@@ -290,7 +290,7 @@ if __name__ == '__main__':
             with tempfile.TemporaryDirectory(prefix='dynamic-link-control-', dir=ROOT / 'build') as directory:
                 source = Path(directory) / 'control.c'
                 dynamic = Path(directory) / 'control'
-                source.write_text('int main(void) { return 0; }\n')
+                source.write_text('int main(void) { return 0; }\n', encoding='utf-8')
                 subprocess.run(['cc', str(source), '-o', str(dynamic)], check=True, capture_output=True)
                 HOST = dynamic
                 control = unittest.TestResult()

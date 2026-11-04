@@ -14,7 +14,7 @@ class UnboundedServe(unittest.TestCase):
         # The listening line is emitted after binding and publishing the port.
         ready = self.proc.stdout.readline()
         self.assertIn(b'listening on', ready)
-        self.base = 'http://127.0.0.1:' + port.read_text().strip()
+        self.base = 'http://127.0.0.1:' + port.read_text(encoding='utf-8').strip()
     def request(self, method, path, value=None):
         data = None if value is None else json.dumps(value).encode()
         req = urllib.request.Request(self.base + path, data=data, method=method, headers={'Content-Type':'application/json'})

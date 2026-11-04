@@ -89,6 +89,7 @@ inline void Registry::set_std_output(std::ostream* sink) {
         output->write(args[0].s.data(), static_cast<std::streamsize>(args[0].s.size()));
         output->put('\n'); return Value::none();
       };
+      if (it->second.entry.dry_fn) it->second.entry.dry_fn = it->second.entry.fn;
     }
   }
 }

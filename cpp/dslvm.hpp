@@ -256,6 +256,12 @@ class Registry {
     for (auto& m : methods_) out.push_back(m.first);
     std::sort(out.begin(), out.end()); return out;
   }
+  // Only SDK-owned sink conversion accepts dry null; host callbacks require live values.
+  bool is_result_conversion(const std::string& name, const FunctionEntry* entry) const {
+    if (name != "lmcode_return_set" && name != "lmcode_return_put") return false;
+    const auto canonical = "fn " + name + signature_text(entry->sig);
+    return std::binary_search(std_signatures_.begin(), std_signatures_.end(), canonical);
+  }
   // Name-only lookup is retained for host introspection; overloaded names are intentionally ambiguous.
   const FunctionEntry* find_function(const std::string& name) const { const FunctionEntry* found = nullptr; for (auto& f : functions_) if (f.second.name == name) { if (found) return nullptr; found = &f.second.entry; } return found; }
   const MethodEntry* find_method(const std::string& type, const std::string& name) const { const MethodEntry* found = nullptr; for (auto& m : methods_) if (m.second.type == type && m.second.name == name) { if (found) return nullptr; found = &m.second.entry; } return found; }
@@ -629,7 +635,8 @@ class Program {
           const Import& imp = imports_[r.u16()]; uint8_t argc = r.u8();
           Args args(argc); for (int i = argc - 1; i >= 0; --i) args[i] = pop();
           update_call_site(fault_pc);
-          if (std::any_of(args.begin(), args.end(), [](const Value& value) { return value.kind == Value::DRY_NULL; }))
+          if ((!ctx.dry() || imp.fn->dry_fn) && !(ctx.dry() && reg.is_result_conversion(imp.name, imp.fn)) &&
+              std::any_of(args.begin(), args.end(), [](const Value& value) { return value.kind == Value::DRY_NULL; }))
             throw Error("RUN_HOST", "dry null cannot be passed to a host callback");
           Value result = ctx.dry() ? (imp.fn->dry_fn ? imp.fn->dry_fn(args) : dry_dummy(reg, imp.fn->sig.returns)) : imp.fn->fn(args);
           if (ctx.dry()) validate_dry_result(result, imp.fn->sig.returns);
@@ -643,12 +650,12 @@ class Program {
           update_call_site(fault_pc);
           if (self.kind == Value::DRY_NULL && (!ctx.dry() || !self.is_dry_null()))
             throw Error("RUN_HOST", "invalid dry null provenance in method receiver");
-          if (std::any_of(args.begin(), args.end(), [](const Value& value) { return value.kind == Value::DRY_NULL; }))
-            throw Error("RUN_HOST", "dry null cannot be passed to a host callback");
           if (ctx.dry() && !imp.method->dry_fn) {
             Value result = dry_dummy(reg, imp.method->sig.returns);
             if (result.kind != Value::VOID) push(std::move(result));
           } else {
+            if (std::any_of(args.begin(), args.end(), [](const Value& value) { return value.kind == Value::DRY_NULL; }))
+              throw Error("RUN_HOST", "dry null cannot be passed to a host callback");
             if (self.is_dry_null()) throw Error("RUN_HOST", "method " + imp.type + "." + imp.name + " requires a concrete receiver after dry null");
             if (self.kind != Value::OBJ || self.type != imp.type) throw Error("RUN_ERROR", "method " + imp.type + "." + imp.name + " called on a " + (self.kind == Value::OBJ ? self.type : std::string(self.kind_name())));
             Value result = ctx.dry() ? imp.method->dry_fn(self.obj, args) : imp.method->fn(self.obj, args);
@@ -779,6 +786,16 @@ class Program {
           return Value::none();
         default: throw Error("RUN_ERROR", "unknown opcode " + std::to_string(op));
         }
+      } catch (const std::bad_alloc&) {
+        Error e("RUN_HOST", "allocation failed");
+        const Line* line = line_of(lines, fault_pc);
+        if (line) e.locate(line->line, line->column);
+        throw e;
+      } catch (const std::length_error&) {
+        Error e("RUN_HOST", "allocation exceeds platform capacity");
+        const Line* line = line_of(lines, fault_pc);
+        if (line) e.locate(line->line, line->column);
+        throw e;
       } catch (Error& e) {
         const Line* line = line_of(lines, fault_pc);
         if (line) e.locate(line->line, line->column);

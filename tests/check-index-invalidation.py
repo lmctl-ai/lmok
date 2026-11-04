@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='lmok-index-stat-') as directory:
 
     def index(*extra):
         result = subprocess.run([host, 'index', str(source), '--db', str(db), *extra],
-                                capture_output=True, text=True, timeout=30)
+                                capture_output=True, text=True, timeout=30, encoding='utf-8', errors='replace')
         assert result.returncode == 0, (result.returncode, result.stderr)
         return result.stdout.strip()
 

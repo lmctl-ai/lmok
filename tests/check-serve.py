@@ -35,8 +35,8 @@ def start(*extra, cwd=ROOT):
                             cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     deadline = time.time() + 20
     while time.time() < deadline:
-        if port_file.exists() and port_file.read_text().strip():
-            return proc, f'http://127.0.0.1:{port_file.read_text().strip()}', Path(tmp)
+        if port_file.exists() and port_file.read_text(encoding='utf-8').strip():
+            return proc, f'http://127.0.0.1:{port_file.read_text(encoding='utf-8').strip()}', Path(tmp)
         if proc.poll() is not None:
             raise SystemExit(f'server exited early: {proc.communicate()}')
         time.sleep(0.05)
@@ -154,18 +154,18 @@ try:
     # --- the cache follows input bytes ---
     work = tmp / 'work'
     work.mkdir()
-    (work / 'doc.json').write_text('{"a": 1}')
+    (work / 'doc.json').write_text('{"a": 1}', encoding='utf-8')
     first = call(base, 'POST', '/v1/run', {'args': ['parse', 'doc.json'], 'cwd': str(work)})
     again = call(base, 'POST', '/v1/run', {'args': ['parse', 'doc.json'], 'cwd': str(work)})
     assert not first['cached'] and again['cached']
-    (work / 'doc.json').write_text('{"a": [1]}')
+    (work / 'doc.json').write_text('{"a": [1]}', encoding='utf-8')
     changed = call(base, 'POST', '/v1/run', {'args': ['parse', 'doc.json'], 'cwd': str(work)})
     assert not changed['cached'] and changed['key'] != first['key'] and 'array' in changed['stdout']
     nocache = call(base, 'POST', '/v1/run', {'args': ['parse', 'doc.json'], 'cwd': str(work), 'cache': False})
     assert not nocache['cached']
     dirrun = call(base, 'POST', '/v1/run', {'args': ['metrics', '--lang', 'json', '.'], 'cwd': str(work)})
     assert call(base, 'POST', '/v1/run', {'args': ['metrics', '--lang', 'json', '.'], 'cwd': str(work)})['cached']
-    (work / 'more.json').write_text('[]')
+    (work / 'more.json').write_text('[]', encoding='utf-8')
     assert not call(base, 'POST', '/v1/run', {'args': ['metrics', '--lang', 'json', '.'], 'cwd': str(work)})['cached'], dirrun
     side = call(base, 'POST', '/v1/run', {'args': ['index', '--db', str(work / 'x.db'), str(work)]})
     assert side['cacheable'] is False and side['ok'], side
@@ -284,7 +284,7 @@ assert proc.returncode == 0 and b'stopped (idle timeout)' in out and 0.8 < time.
 ok('idle timeout stops a quiet server')
 
 presets_file = Path(tempfile.mkdtemp(prefix='lmok-presets-')) / 'presets.json'
-presets_file.write_text(json.dumps({'presets': [{'name': 'team', 'description': 'ours', 'settings': {'lang': 'go', 'idle_timeout_s': 30}}]}))
+presets_file.write_text(json.dumps({'presets': [{'name': 'team', 'description': 'ours', 'settings': {'lang': 'go', 'idle_timeout_s': 30}}]}), encoding='utf-8')
 proc, base, _ = start('--presets', str(presets_file), '--preset', 'team')
 try:
     view = call(base, 'GET', '/v1/settings')
@@ -298,7 +298,7 @@ finally:
 listing = local('serve', '--presets', str(presets_file), '--list-presets')
 assert listing.returncode == 0 and b'team\tours' in listing.stdout and b'interactive\t' in listing.stdout
 bad_file = presets_file.with_name('bad.json')
-bad_file.write_text(json.dumps({'presets': [{'name': 'x', 'settings': {'lang': 3}}]}))
+bad_file.write_text(json.dumps({'presets': [{'name': 'x', 'settings': {'lang': 3}}]}), encoding='utf-8')
 assert local('serve', '--presets', str(bad_file)).returncode == 2
 assert local('serve', '--preset', 'nope', '--port', '0').returncode == 2
 assert local('serve', '--port', 'abc').returncode == 2

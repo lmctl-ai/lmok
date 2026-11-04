@@ -22,7 +22,7 @@ cases=[('idle','s.set("idle_timeout_s", Json::of(0));','s.set("idle_timeout_s", 
 def build():
     subprocess.run(['cmake','--build',str(Path(host).parent),'-j2'],cwd=ROOT,check=True,stdout=subprocess.DEVNULL)
 def check():
-    return subprocess.run([sys.executable,'tests/check-serve-unbounded.py',host],cwd=ROOT,capture_output=True,text=True)
+    return subprocess.run([sys.executable,'tests/check-serve-unbounded.py',host],cwd=ROOT,capture_output=True,text=True, encoding='utf-8', errors='replace')
 assert check().returncode==0,'baseline must pass'
 try:
     for name,before,after in cases:

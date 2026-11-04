@@ -21,18 +21,18 @@ with tempfile.TemporaryDirectory(prefix='injection-mutants-',dir=ROOT/'build') a
     build=Path(tmp)/'build'
     (clone/'build').mkdir()
     def command(args):
-        r=subprocess.run(args,cwd=clone,capture_output=True,text=True)
+        r=subprocess.run(args,cwd=clone,capture_output=True,text=True, encoding='utf-8', errors='replace')
         assert r.returncode==0,r.stdout+r.stderr
     command(['cmake','-S',str(clone),'-B',str(build),'-G','Ninja','-DCMAKE_BUILD_TYPE=Release'])
-    originals={name:(clone/'cpp'/name).read_text() for name in {c[1] for c in CASES}}
+    originals={name:(clone/'cpp'/name).read_text(encoding='utf-8') for name in {c[1] for c in CASES}}
     def run():
         command(['cmake','--build',str(build),'-j2'])
-        return subprocess.run(['python3',str(clone/'tests/check-injections.py'),str(build/('lmok.exe' if os.name=='nt' else 'lmok'))],cwd=clone,capture_output=True,text=True)
+        return subprocess.run(['python3',str(clone/'tests/check-injections.py'),str(build/('lmok.exe' if os.name=='nt' else 'lmok'))],cwd=clone,capture_output=True,text=True, encoding='utf-8', errors='replace')
     r=run();assert r.returncode==0,r.stdout+r.stderr;print('BASELINE PASS',flush=True)
     for name,file,before,after in CASES:
-        for f,src in originals.items():(clone/'cpp'/f).write_text(src)
+        for f,src in originals.items():(clone/'cpp'/f).write_text(src, encoding='utf-8')
         assert originals[file].count(before)==1,('anchor',name)
-        (clone/'cpp'/file).write_text(originals[file].replace(before,after))
+        (clone/'cpp'/file).write_text(originals[file].replace(before,after), encoding='utf-8')
         r=run();assert r.returncode!=0,('SURVIVED',name)
         assert 'AssertionError' in r.stderr and 'FAILED (failures=' in r.stderr,r.stdout+r.stderr
         assert 'ERROR:' not in r.stderr,r.stderr

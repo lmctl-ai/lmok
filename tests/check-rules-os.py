@@ -66,8 +66,8 @@ class RulePacksOS(unittest.TestCase):
     def compile(self, body):
         src = self.work / 'rule.lms'
         binary = self.work / 'rule.dslb'
-        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\n')
-        r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(src), str(binary)], capture_output=True, text=True)
+        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\n', encoding='utf-8')
+        r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(src), str(binary)], capture_output=True, text=True, encoding='utf-8', errors='replace')
         self.assertEqual(r.returncode, 0, r.stderr)
         return binary
 
@@ -79,8 +79,8 @@ class RulePacksOS(unittest.TestCase):
         self.assertEqual(len(packs), 16, packs)  # a new pack must be wired in here by glob, so pin the count
         for pack in packs:
             with self.subTest(pack=pack.name):
-                header = [line[9:].split() for line in pack.read_text().splitlines() if line.startswith('# check: ')]
-                r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(pack), str(self.work / (pack.stem + '.dslb'))], capture_output=True, text=True, cwd=ROOT)
+                header = [line[9:].split() for line in pack.read_text(encoding='utf-8').splitlines() if line.startswith('# check: ')]
+                r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(pack), str(self.work / (pack.stem + '.dslb'))], capture_output=True, text=True, cwd=ROOT, encoding='utf-8', errors='replace')
                 self.assertEqual(r.returncode, 0, r.stderr)
                 # Use this test invocation's explicit fixture output, never a stale build artifact.
                 binary = self.work / (pack.stem + '.dslb')
@@ -113,7 +113,7 @@ class RulePacksOS(unittest.TestCase):
                         db_args = ['--db', db]
                     result = self.run_host('--lmcode', binary, *db_args, cwd=ROOT)
                     if db_args:
-                        expected = ''.join(line[2:] + '\n' for line in pack.read_text().splitlines() if line.startswith('#|')).encode()
+                        expected = ''.join(line[2:] + '\n' for line in pack.read_text(encoding='utf-8').splitlines() if line.startswith('#|')).encode()
                         self.assertEqual(result.stdout.split(b'{"host_summary":')[0], expected)
                     self.assertEqual(result.stderr, b'', result)
                     self.assertEqual(result.returncode, 0, result.stdout)
@@ -213,7 +213,7 @@ class LauncherOS(unittest.TestCase):
         argv = compiler_argv()
         if os.name == 'nt':
             self.assertTrue(argv[0].lower().endswith(('.cmd', '.exe', '.bat')), argv)
-        r = subprocess.run([*argv, '--version'], capture_output=True, text=True)
+        r = subprocess.run([*argv, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace')
         self.assertEqual(r.returncode, 0, r.stderr)
         # This oracle checks launcher mechanics; RulePacksOS above compiles and
         # executes actual v6 entries. Source package metadata can be historical.

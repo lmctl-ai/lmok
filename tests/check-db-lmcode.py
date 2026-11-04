@@ -94,7 +94,7 @@ elif mode == 'errors':
         result = frame(run(['--lmcode', chunk, *args], expected=2))
         assert result['phase'] == 'cli', result
     corrupt = scratch / 'corrupt.db'
-    corrupt.write_text('not SQLite')
+    corrupt.write_text('not SQLite', encoding='utf-8')
     result = frame(run(['--lmcode', chunk, '--db', corrupt], expected=3))
     assert result['phase'] == 'run' and result['line'] == 2, result
     # DB access is lazy: a non-DB script must work without any index.
@@ -103,7 +103,7 @@ elif mode == 'errors':
 elif mode == 'rule':
     source = root / 'rules/lmcode/c-repowide-undefined-call.lms'
     chunk = compile_file(source, 'rule')
-    expected = ''.join(line[2:] + '\n' for line in source.read_text().splitlines() if line.startswith('#|'))
+    expected = ''.join(line[2:] + '\n' for line in source.read_text(encoding='utf-8').splitlines() if line.startswith('#|'))
     assert expected, 'pin actual run output in rule header'
     output = run(['--lmcode', chunk, '--db', db])
     assert domain(output) == expected, output

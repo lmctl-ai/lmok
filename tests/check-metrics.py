@@ -40,12 +40,12 @@ def rejected(actual, expected):
 with tempfile.TemporaryDirectory(prefix='metrics os ',dir=ROOT/'build') as tmp:
     tmp = Path(tmp)
     for lang, ext, col in [('c','c',3),('python','py',4)]:
-        pack = (ROOT/'rules/lmcode'/f'{lang}-function-cognitive-complexity.lms').read_text()
+        pack = (ROOT/'rules/lmcode'/f'{lang}-function-cognitive-complexity.lms').read_text(encoding='utf-8')
         def compile_pack(threshold, zero=False):
             source = pack.replace('cli="lmok"','schema='+json.dumps(str(ROOT/'schema/lmok.dsl.json')))
             source = source.replace('score > 15', threshold)
             if zero: source = source.replace('let score = cognitive_score(n);','let score = 0;')
-            path = tmp/'rule.lms'; binary=tmp/'rule.dslb'; path.write_text(source)
+            path = tmp/'rule.lms'; binary=tmp/'rule.dslb'; path.write_text(source, encoding='utf-8')
             result = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"),str(path),str(binary)],capture_output=True,timeout=60)
             assert result.returncode == 0,(result.stdout,result.stderr)
             return binary
@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix='metrics os ',dir=ROOT/'build') as tmp:
         body=TABLE[-1][col]
         if lang=='c': body=body.replace('if(f){return 1;}','return 1;')
         else: body=body.replace('                    if f:\n                        return 1','                    return 1')
-        boundary.write_text(function('boundary',body))
+        boundary.write_text(function('boundary',body), encoding='utf-8')
         assert json.loads(run('check','--lang',lang,binary,boundary).splitlines()[0])==[]
         # Arithmetic has zero complexity; strings/comments containing keywords do too.
         for data,lines in [(b'',0),(b'\n',1),(b'\n\n',2),(b'x=1',1),(b'x=1\r\n',1)]:

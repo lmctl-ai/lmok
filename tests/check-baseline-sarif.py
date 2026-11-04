@@ -194,14 +194,14 @@ class Baseline(unittest.TestCase):
         # (rule/message) must misclassify everything as new — entries that
         # cannot be keyed never match.
         broken = []
-        for line in (self.work / 'base.lintout').read_text().splitlines():
+        for line in (self.work / 'base.lintout').read_text(encoding='utf-8').splitlines():
             if line.startswith('{'):
                 entry = json.loads(line)
                 del entry['rule'], entry['message']
                 broken.append(json.dumps(entry))
             else:
                 broken.append(line)
-        (self.work / 'broken.lintout').write_text('\n'.join(broken) + '\n')
+        (self.work / 'broken.lintout').write_text('\n'.join(broken) + '\n', encoding='utf-8')
         mis = self.run_host('lint', PACK, 'a.c', '--baseline', self.work / 'broken.lintout')
         self.assertEqual(mis.stdout,
                          (GETS_V2 + '\n' + STRCPY + '\n2 findings in a.c\n2 new, 0 baseline\n').encode())
@@ -261,7 +261,7 @@ class Baseline(unittest.TestCase):
             {'id': 'C1', 'on': 'comment', 'message': 'crit {text}', 'severity': 'critical'},
             {'id': 'M1', 'on': 'comment', 'message': 'maj {text}', 'severity': 'major'},
             {'id': 'N1', 'on': 'comment', 'message': 'min {text}', 'severity': 'minor',
-             'url': 'https://example.test/N1'}]}))
+             'url': 'https://example.test/N1'}]}), encoding='utf-8')
         source = self.repo / 'input.c'
         source.write_bytes(b'// hi\nint x;\n')
         sarif = self.work / 'lint.sarif'
@@ -330,8 +330,8 @@ class Baseline(unittest.TestCase):
             'p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n'
             'ts.report(ts.parse_c("int body;").root(), "body finding", "B001", "major");\n'
             '@comment fn fixme(n: Node) -> void implements Rule { ts.report(n, "FIXME left", "X001", "minor"); }\n'
-            'end _lmcode_\n')
-        compiled = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(source), str(binary)], capture_output=True, text=True)
+            'end _lmcode_\n', encoding='utf-8')
+        compiled = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(source), str(binary)], capture_output=True, text=True, encoding='utf-8', errors='replace')
         self.assertEqual(compiled.returncode, 0, compiled.stderr)
         target = self.repo / 'input.c'
         target.write_bytes(b'// FIXME: later\nint x;\n')
@@ -357,11 +357,11 @@ class Baseline(unittest.TestCase):
         pack = self.work / 'pack.json'
         pack.write_text(json.dumps({'lang': 'c', 'rules': [
             {'id': 'C1', 'on': 'comment', 'message': 'crit {text}', 'severity': 'critical',
-             'url': 'https://example.test/C1'}]}))
+             'url': 'https://example.test/C1'}]}), encoding='utf-8')
         project = self.work / 'proj'
         (project / '.lmok').mkdir(parents=True)
         (project / '.lmok/config.json').write_text(json.dumps(
-            {'version': 1, 'packs': {'c': ['pack.json']}, 'severity_floor': 'critical', 'fail_on': 'findings'}))
+            {'version': 1, 'packs': {'c': ['pack.json']}, 'severity_floor': 'critical', 'fail_on': 'findings'}), encoding='utf-8')
         shutil.copy(pack, project / 'pack.json')
         (project / 'live.c').write_bytes(b'// hi\nint x;\n')
         sarif = self.work / 'ci.sarif'

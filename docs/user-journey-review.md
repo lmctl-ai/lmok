@@ -1,8 +1,8 @@
 # New-user journey review
 
 Reviewed **2026-10-31**, starting from main `b3a6537`, then rebased through `f904436` (outline) onto `5440a29`, on Linux ARM64.
-This replaces the October 28 pre-rename review: its `savedsl`, two-step
-script execution, v0.4.0 install and 53-check claims no longer describe main.
+This replaces the October 28 pre-rename review: its two-step
+bytecode export and execution, v0.4.0 install and 53-check claims no longer describe main.
 Changes here are documentation and the compiler invocation in
 `examples/metrics.sh`; no host, rule logic, workflow or version changes.
 
@@ -15,9 +15,9 @@ low = inventory or navigation.
 | --- | --- | --- |
 | High | Bootstrap fetches private `lmctlhq/lmctl-mono` (GitHub API confirms private visibility). Main CI run [41230275702](https://github.com/lmctl-ai/lmok/actions/runs/41230275702) fails all five compiler-install jobs with Git credential errors. | **Needs packaging/access work outside this docs-only task.** This machine's authenticated bootstrap succeeds; public users cannot reproduce the full gate without access. README now separates the standalone native build from restricted scripting/test setup. No workflow or credential changes made. |
 | High | npm-only lmscript cannot export the repository fixtures; package version is not the compiler contract. | Fixed docs: bootstrap `compiler.lock` once, export `LMSCRIPT_BIN` and its directory plus the built host on PATH. Bootstrap completed and its smoke test passed. |
-| High | Published v0.6.11 and dist accept `--dsl*`, while main accepts only `--lmcode*`. `--lmcode-schema --json` exits 2 on both published hosts. Raw-URL `lmctl autorun` without the source-built host likewise exits 2 after selecting the published host. | Documented compatibility boundary. **Publication work remains** to ship main's renamed host contract; main scripts must use the matching source-built host. No code workaround added. |
+| High | Published v0.6.11 and dist accept the retired flag family, while main accepts only the renamed family. `--lmcode-schema --json` exits 2 on both published hosts. Raw-URL `lmctl autorun` without the source-built host likewise exits 2 after selecting the published host. | Documented compatibility boundary. **Publication work remains** to ship main's renamed host contract; main scripts must use the matching source-built host. No code workaround added. |
 | High | `lmctl install github:lmctl-ai/lmok` is an unknown command. | Fixed docs: `lmscript install github:lmctl-ai/lmok@latest` resolves v0.6.11, validates SHA-256 and prints its cached executable path. Installation does not put `lmok` on PATH. |
-| High | Positional `lmscript SOURCE OUTPUT.dslb` and old `savedsl` instructions no longer export bytecode. Direct entry-only scripts do not dispatch rules over source inputs. | Fixed docs: ordinary scripts use `run_lmcode`; entry fixtures use `node scripts/compile-fixture.mjs` followed by `check`. Explicitly label exporter as a maintainer helper. Updated `examples/metrics.sh`, which previously tried to check a nonexistent exported file. |
+| High | The positional two-argument compile call and the old bytecode-export instructions no longer export bytecode. Direct entry-only scripts do not dispatch rules over source inputs. | Fixed docs: ordinary scripts use `run_lmcode`; entry fixtures use `node scripts/compile-fixture.mjs` followed by `check`. Explicitly label exporter as a maintainer helper. Updated `examples/metrics.sh`, which previously tried to check a nonexistent exported file. |
 | Medium | Build prerequisites, compiler/host PATH, output directories and repo-root cwd were scattered or missing. | Consolidated source setup, compiler cache explanation, prerequisites and scratch-directory commands. No missing local prerequisite was encountered. |
 | Medium | Raw URLs fetch only the script, not referenced fixture files. `@latest` is moving, not a pin. | Fixed docs: distinguish source/raw URL, release install and dist download; explain cwd, PATH and fixed tags/commits. Raw parse-string invocation passed with the source setup. |
 | Medium | Status documentation said index did not exist; CLI overview omitted shipped verbs. | Fixed: table covers all 16 named verbs and host inspection/execution options; runnable DB sequence and baseline/SARIF examples. `outline` landed during review and was added; `find` and `ts.db_*` remain proposals. |
@@ -45,7 +45,7 @@ Each published binary passed parse/facts for all 11 languages, query (native
 and code-shaped), lint, rules, annotated fixture test, metrics, dup, project
 ci, and the full DB/baseline/SARIF/autofix/suppression sequence below. `ci`
 exits **1** on `tests/fixtures/project-ci` as intended for its planted finding.
-Their schema/signature probes pass under the older `--dsl*` spellings.
+Their schema/signature probes pass under the older retired spellings.
 This is not a claim that release bytecode/compiler compatibility matches main.
 
 ## Tier-3 journey, end to end

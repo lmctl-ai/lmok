@@ -37,13 +37,13 @@ with tempfile.TemporaryDirectory(prefix='dup os ',dir=ROOT/'build') as tmp:
         assert run('dup','--tokens',width,p).stdout == r.stdout
         assert run('dup','--tokens',width,p).stdout == r.stdout  # deterministic
     p = tmp / 'keywords.c'
-    p.write_text('if (one) work(); while (two) work();\n')
+    p.write_text('if (one) work(); while (two) work();\n', encoding='utf-8')
     assert run('dup','--tokens','8',p).stdout == b'', 'keywords must not normalize to identifiers'
-    p.write_text('a += 1; b -= 2;\n')
+    p.write_text('a += 1; b -= 2;\n', encoding='utf-8')
     assert run('dup','--tokens','4',p).stdout == b'', 'operators must remain distinct'
-    p.write_text('alpha = 1 + 2; /* comment words are not tokens */\nbeta = 3 + 4;\n')
+    p.write_text('alpha = 1 + 2; /* comment words are not tokens */\nbeta = 3 + 4;\n', encoding='utf-8')
     assert len(run('dup','--tokens','6',p).stdout.splitlines()) == 2
-    p.write_text('a + a + a;')
+    p.write_text('a + a + a;', encoding='utf-8')
     assert run('dup','--tokens','5',p).stdout == b'', 'overlapping repeats are not two clones'
     for n in ['0','-1','4x','99999999999999999999999']:
         assert run('dup','--tokens',n,p).returncode == 2

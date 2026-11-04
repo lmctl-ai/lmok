@@ -100,7 +100,7 @@ with tempfile.TemporaryDirectory(prefix='language-packs-', dir=ROOT / 'build') a
         again = lint(PACKS["lmscript"], target, "--fix")
         if again.returncode or target.read_bytes() != fixture.read_bytes():
             raise SystemExit("nonidempotent near-miss fix: " + name)
-    for item in json.loads(PACKS['lmscript'].read_text())['rules']:
+    for item in json.loads(PACKS['lmscript'].read_text(encoding='utf-8'))['rules']:
         if 'guard' in item and ('guarded_query' not in item or 'query' in item):
             raise SystemExit('guarded rule must fail closed on older runtimes')
     host_positions = [
@@ -110,18 +110,18 @@ with tempfile.TemporaryDirectory(prefix='language-packs-', dir=ROOT / 'build') a
     ]
     for index, (before, old, new) in enumerate(host_positions):
         source = scratch / f'host-position-{index}.lms'
-        source.write_text(before)
+        source.write_text(before, encoding='utf-8')
         result = lint(PACKS['lmscript'], source, '--fix')
         expected = before.replace(old, new)
-        if result.returncode or source.read_text() != expected:
+        if result.returncode or source.read_text(encoding='utf-8') != expected:
             raise SystemExit('recognized host option not fixed: ' + before)
         again = lint(PACKS['lmscript'], source, '--fix')
-        if again.returncode or source.read_text() != expected:
+        if again.returncode or source.read_text(encoding='utf-8') != expected:
             raise SystemExit('recognized option fix is not idempotent')
-    invalid = json.loads(PACKS['lmscript'].read_text())
+    invalid = json.loads(PACKS['lmscript'].read_text(encoding='utf-8'))
     invalid['rules'][0]['guard'] = 'typo-guard'
     badpack = scratch / 'invalid-guard.json'
-    badpack.write_text(json.dumps(invalid))
+    badpack.write_text(json.dumps(invalid), encoding='utf-8')
     refused = lint(badpack, FIXTURES / 'lmscript/LMS001-positive.lms')
     if refused.returncode != 2 or b'invalid lmscript structural guard' not in refused.stderr:
         raise SystemExit('unknown structural guard silently accepted')
@@ -147,13 +147,13 @@ with tempfile.TemporaryDirectory(prefix='language-packs-', dir=ROOT / 'build') a
 
     # The lmcode modernization advice belongs only to an injected lmscript body.
     plain = scratch / 'standalone.lmcode'
-    plain.write_text('let n=7; let text="value="+str(n)+"!";\n')
+    plain.write_text('let n=7; let text="value="+str(n)+"!";\n', encoding='utf-8')
     result = lint(PACKS['lmcode'], plain)
     if result.returncode or finding_rows(result.stdout): raise SystemExit('body-only pack leaked into standalone lmcode')
-    data = json.loads(PACKS['lmcode'].read_text())
+    data = json.loads(PACKS['lmcode'].read_text(encoding='utf-8'))
     data['rules'][0].pop('guard')
     unguarded = scratch / 'unguarded.json'
-    unguarded.write_text(json.dumps(data))
+    unguarded.write_text(json.dumps(data), encoding='utf-8')
     if 'LMC001' not in [r['rule'] for r in finding_rows(lint(unguarded, plain).stdout)]: raise SystemExit('removed-context guard control failed')
 
     # Exercise both new packs through the documented root-relative project config.

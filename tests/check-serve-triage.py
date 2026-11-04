@@ -71,11 +71,11 @@ server = subprocess.Popen([HOST, 'serve', '--port', '0', '--port-file', str(port
                           cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 try:
     deadline = time.time() + 20
-    while not (port_file.exists() and port_file.read_text().strip()):
+    while not (port_file.exists() and port_file.read_text(encoding='utf-8').strip()):
         if time.time() > deadline or server.poll() is not None:
             raise SystemExit(f'server did not start: {server.poll()}')
         time.sleep(0.05)
-    base = f'http://127.0.0.1:{port_file.read_text().strip()}'
+    base = f'http://127.0.0.1:{port_file.read_text(encoding='utf-8').strip()}'
 
     # Session setup: the `c` preset selects --lang c, the C tier-1 pack and rule
     # metadata; the client then points the server at its project directory.
@@ -125,7 +125,7 @@ try:
         kind, span = lines[1].split(' ')
         (r0, c0), (r1, c1) = [tuple(int(x) for x in p.split(':')) for p in span.split('-')]
         assert r0 == r1 == row
-        text = (project / norm(file)).read_text().splitlines()[r0][c0:c1]
+        text = (project / norm(file)).read_text(encoding='utf-8').splitlines()[r0][c0:c1]
         verdicts[norm(file)] = (scope, kind, text)
     assert verdicts == {'main.c': ('main', 'subscript_expression', 'argv[1]'),
                         'report.c': ('report_header', 'string_literal', '"report"')}, verdicts
@@ -151,7 +151,7 @@ try:
 
     # 7. Fix the sink and verify: the edit invalidates both the file and folder entries.
     source = project / 'names.c'
-    source.write_text(source.read_text().replace('strcpy(dst, src);', 'snprintf(dst, 16, "%s", src);'))
+    source.write_text(source.read_text(encoding='utf-8').replace('strcpy(dst, src);', 'snprintf(dst, 16, "%s", src);'), encoding='utf-8')
     fixed = call(base, 'POST', '/v1/lint', {'file': 'names.c'})
     assert not fixed['cached'] and findings(fixed) == [], fixed['stdout']
     refreshed = call(base, 'POST', '/v1/facts', {'files': ['.']})

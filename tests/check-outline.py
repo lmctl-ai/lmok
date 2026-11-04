@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='lmok-outline-') as directory:
     if mode == 'live':
         assert run('outline', 'src') == plain
         assert run('outline', 'src/c.py', './src/b.c', 'src/a.c', 'src/b.c') == plain
-        (root / 'src/empty.c').write_text(' \n')
+        (root / 'src/empty.c').write_text(' \n', encoding='utf-8')
         assert run('outline', 'src') == plain
         assert not (root / '.lmok').exists()
     elif mode == 'db':
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='lmok-outline-') as directory:
         assert run('outline', '--db', '.lmok/lmok.db', 'src') == ranked
         assert run('outline', 'src/c.py', 'src/b.c', 'src/a.c') == ranked
         # DB ranking must never substitute stale definitions/signatures.
-        (root / 'src/b.c').write_text('int fresh(void) {}\n')
+        (root / 'src/b.c').write_text('int fresh(void) {}\n', encoding='utf-8')
         changed = run('outline', 'src')
         assert b'fresh  function  0:0  signature: int fresh(void) {}' in changed
         assert b'beta  function' not in changed

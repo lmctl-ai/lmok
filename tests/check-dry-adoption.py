@@ -51,7 +51,7 @@ def run_case(mode, dry):
             "mode": "single",
             "dry": dry,
             "parts": [{"index": 0, "file": str(bytecode)}],
-        }))
+        }), encoding='utf-8')
         env = dict(os.environ, LMCODE_INVOCATION_FILE=str(manifest))
         if mode == "--lmcode":
             args = [str(HOST), "--lmcode", str(bytecode)]

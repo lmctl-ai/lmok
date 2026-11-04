@@ -20,7 +20,7 @@ comments pin its domain output.
 The `install="github:lmctl-ai/lmok@latest"` declaration can resolve a
 published host when one is not on PATH. The renamed assets are published;
 latest resolved v0.6.11 in the 2026-10-31 review. That host still uses the
-old `--dsl` flags: main examples require the source-built host and pinned
+the retired flag family: main examples require the source-built host and pinned
 compiler above. It follows the latest release,
 not a fixed version pin. Compilation is offline once the local host and
 compiler are available. Raw URL invocation and its working-directory

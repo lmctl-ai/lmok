@@ -27,7 +27,7 @@ class Contracts(unittest.TestCase):
         self.assertEqual(listing.stdout,self.run_host('rules',self.pack).stdout)
     def test_ci_metadata_uses_the_same_opt_in_contract(self):
         self.file('int f(){foo();}\n')
-        config=self.work/'config.json';config.write_text(json.dumps(dict(version=1,packs={'c':['pack.json']},fail_on='none')))
+        config=self.work/'config.json';config.write_text(json.dumps(dict(version=1,packs={'c':['pack.json']},fail_on='none')), encoding='utf-8')
         plain=self.run_host('ci','--config',config,self.work);self.assertEqual(plain.returncode,0,plain.stderr)
         finding=next(json.loads(line) for line in plain.stdout.splitlines() if '"rule"' in line);self.assertNotIn('metadata',finding)
         rich=self.run_host('ci','--config',config,self.work,'--metadata');self.assertEqual(rich.returncode,0,rich.stderr)
@@ -40,13 +40,13 @@ class Contracts(unittest.TestCase):
         self.assertEqual(rule['helpUri'],self.rule['url']);self.assertIn('properties',rule,'pack rule metadata must reach SARIF')
         self.assertEqual(rule['properties']['cwe'],['CWE-78']);self.assertEqual(rule['properties']['tags'],['a','z']);self.assertEqual(rule['properties']['confidence'],'high')
         self.assertEqual(run['results'][0]['properties'],rule['properties'])
-        config=self.work/'config.json';config.write_text(json.dumps(dict(version=1,packs={'c':['pack.json']},fail_on='none')))
+        config=self.work/'config.json';config.write_text(json.dumps(dict(version=1,packs={'c':['pack.json']},fail_on='none')), encoding='utf-8')
         artifact=self.work/'ci.sarif';r=self.run_host('ci','--config',config,self.work,'--sarif',artifact);self.assertEqual(r.returncode,0,r.stderr)
         run=json.loads(artifact.read_text(encoding='utf8'))['runs'][0]
         self.assertEqual(run['tool']['driver']['rules'][0]['properties']['tags'],['a','z'])
         self.assertEqual(run['results'][0]['properties']['owasp'],['A03:2021'])
     def test_catalog_sort_order_is_independent_of_pack_order(self):
-        other=self.work/'second.json';other.write_text(json.dumps(dict(lang='c',rules=[dict(self.rule,id='A')])))
+        other=self.work/'second.json';other.write_text(json.dumps(dict(lang='c',rules=[dict(self.rule,id='A')])), encoding='utf-8')
         first=self.run_host('rules',self.pack,other);second=self.run_host('rules',other,self.pack)
         self.assertEqual(first.returncode,0,first.stderr);self.assertEqual(first.stdout,second.stdout)
         self.assertEqual([json.loads(line)['id'] for line in first.stdout.splitlines()],['A','R'])
@@ -83,7 +83,7 @@ class Contracts(unittest.TestCase):
         self.assertTrue(json.loads(r.stdout)['ok'])
         listing=self.run_host('rules',self.pack);self.assertEqual(json.loads(listing.stdout)['id'],'régle:R')
     def test_multiple_ids_and_clean_files(self):
-        self.rule['id']='A';other=dict(self.rule,id='B');self.pack.write_text(json.dumps(dict(lang='c',rules=[self.rule,other])))
+        self.rule['id']='A';other=dict(self.rule,id='B');self.pack.write_text(json.dumps(dict(lang='c',rules=[self.rule,other])), encoding='utf-8')
         src=self.file('int f(){foo();} // lmok-expect: A,B\n')
         clean=self.file('int f(){return 0;}\n','clean.c')
         r=self.run_host('test',self.pack,src,clean);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(json.loads(r.stdout)['expected'],2)

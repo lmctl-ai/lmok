@@ -20,8 +20,8 @@ class Security(unittest.TestCase):
         self.secret = 'AK' + 'IA' + 'A1B2C3D4E5F6G7H8'
         self.src = self.work / 'secret.c'
         self.src.write_text('const char *key="' + self.secret + '";\r\nint n=01;\r\n', encoding='utf-8')
-        pack = json.loads((ROOT / 'rules/secrets-c.json').read_text())
-        pack['rules'] += json.loads((ROOT / 'rules/c-autofix.json').read_text())['rules']
+        pack = json.loads((ROOT / 'rules/secrets-c.json').read_text(encoding='utf-8'))
+        pack['rules'] += json.loads((ROOT / 'rules/c-autofix.json').read_text(encoding='utf-8'))['rules']
         self.pack = self.work / 'combined.json'
         self.pack.write_text(json.dumps(pack), encoding='utf-8')
 

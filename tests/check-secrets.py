@@ -56,14 +56,14 @@ with tempfile.TemporaryDirectory(prefix='secrets os ', dir=ROOT / 'build') as tm
         if lang == 'json':
             # Execute broken packs before the positive oracle: omission and raw-text
             # regressions must be rejected by the same assertions used below.
-            data = json.loads(pack.read_text())
+            data = json.loads(pack.read_text(encoding='utf-8'))
             bad = tmp / 'mutant.json'
             data['rules'] = data['rules'][1:]
-            bad.write_text(json.dumps(data))
+            bad.write_text(json.dumps(data), encoding='utf-8')
             reject(len(findings(bad, source)[0]), len(samples))
-            data = json.loads(pack.read_text())
+            data = json.loads(pack.read_text(encoding='utf-8'))
             for rule in data['rules']: rule['redact'] = False
-            bad.write_text(json.dumps(data))
+            bad.write_text(json.dumps(data), encoding='utf-8')
             raw = findings(bad, source)[0][0]['message']
             reject(raw, 'AWS secret ' + samples[0][1][:4] + '[REDACTED]')
             print('ok - executed failing controls: omitted detector and disabled redaction')
@@ -94,7 +94,7 @@ with tempfile.TemporaryDirectory(prefix='secrets os ', dir=ROOT / 'build') as tm
             baseline = run('lint',pack,source,'--db',db,'--new-since','last')
             assert baseline.returncode==0 and not any(line.startswith(b'{') for line in baseline.stdout.splitlines()), baseline
             rotated=samples[0][1][:-1]+'9'
-            text=source.read_text().replace(samples[0][1],rotated)
+            text=source.read_text(encoding='utf-8').replace(samples[0][1],rotated)
             source.write_bytes(text.encode())
             changed=run('lint',pack,source,'--db',db,'--new-since','last')
             fs_changed=[json.loads(line) for line in changed.stdout.splitlines() if line.startswith(b'{')]
@@ -109,7 +109,7 @@ with tempfile.TemporaryDirectory(prefix='secrets os ', dir=ROOT / 'build') as tm
         write([('password', 'a' * 40), ('value1', 'github' + '_pat_x'), ('value2', 'gh' + 'p_' + 'a' * 35)])
         assert findings(pack, source)[0] == []
         if lang == 'c':
-            source.write_text('void set(void){ const char *password; password = '+json.dumps(samples[-1][1])+'; }')
+            source.write_text('void set(void){ const char *password; password = '+json.dumps(samples[-1][1])+'; }', encoding='utf-8')
             fs, result = findings(pack, source)
             assert len(fs)==1 and fs[0]['rule']=='SEC_ENTROPY',fs
             assert samples[-1][1].encode() not in result.stdout
@@ -123,13 +123,13 @@ with tempfile.TemporaryDirectory(prefix='secrets os ', dir=ROOT / 'build') as tm
     assert run('query', pattern.replace('0.9', '1'), source).stdout == b''
     for value in ['nan', '-1', '8.1', '1x']:
         assert run('query', pattern.replace('0.9', value), source).returncode == 3
-    source.write_text(json.dumps(['ab' * 9000]))
+    source.write_text(json.dumps(['ab' * 9000]), encoding='utf-8')
     assert run('query', pattern, source).stdout == b''
     assert run('query', '((string_content) @s (#entropy-gt? @s))', source).returncode == 3
     bad = tmp/'unknown-capture.json'
-    bad.write_text(json.dumps(dict(lang='json',rules=[dict(id='BAD',query='(number) @value',capture='typo',message='bad')])))
+    bad.write_text(json.dumps(dict(lang='json',rules=[dict(id='BAD',query='(number) @value',capture='typo',message='bad')])), encoding='utf-8')
     assert run('lint',bad,source).returncode == 3  # no numbers match; typo still fails
-    bad.write_text(json.dumps(dict(lang='json',rules=[dict(id='BAD',on='string_content',redact='true',message='bad')])))
+    bad.write_text(json.dumps(dict(lang='json',rules=[dict(id='BAD',on='string_content',redact='true',message='bad')])), encoding='utf-8')
     assert run('lint',bad,source).returncode == 2
     print('ok - entropy strict threshold/domain/arity/bound, capture typo and redact type')
     # Scan only tracked sources (generated build/npm/vendor trees are not the repository).

@@ -7,8 +7,8 @@ ROOT=Path(__file__).resolve().parents[1]
 def check(host):
  host=str(Path(host).resolve())
  with tempfile.TemporaryDirectory(prefix='lmok-invocation-',dir=ROOT/'build') as temp:
-  work=Path(temp).resolve();target=work/'水 input.json';target.write_text('{"a":1,"b":2}')
-  sarif=work/'result.sarif';schema=work/'other.json';other=json.loads((ROOT/'schema/lmok.dsl.json').read_text());other['name']='other';schema.write_text(json.dumps(other))
+  work=Path(temp).resolve();target=work/'水 input.json';target.write_text('{"a":1,"b":2}', encoding='utf-8')
+  sarif=work/'result.sarif';schema=work/'other.json';other=json.loads((ROOT/'schema/lmok.dsl.json').read_text(encoding='utf-8'));other['name']='other';schema.write_text(json.dumps(other), encoding='utf-8')
   def q(v):return json.dumps(str(v),ensure_ascii=False)
   source=f'''s=load_schema(cli={q(shlex.quote(host))});
 p=_lmcode_ s;
@@ -45,7 +45,7 @@ r=run_lmcode(global_builder,{{args:[{q(target)},"--sarif",{q(work)}]}});
 assert(!r.ok&&r.phase=="app"&&!r.has("part")&&!r.has("result")&&!r.has("parts"),"builder global SARIF failure");
 println("PASS real lmok invocation integration");
 '''
-  file=work/'real.lms';file.write_text(source)
+  file=work/'real.lms';file.write_text(source, encoding='utf-8')
   p=subprocess.run([os.environ.get('LMSCRIPT_BIN','lmscript'),str(file)],cwd=ROOT,capture_output=True)
   assert p.returncode==0 and b'PASS real lmok invocation integration' in p.stdout,(p.returncode,p.stdout,p.stderr)
   for line in p.stdout.splitlines():
@@ -53,7 +53,7 @@ println("PASS real lmok invocation integration");
   assert p.stdout.count(b'"host_summary":')==13,('lost summary',p.stdout)
   groups=[json.loads(line) for line in p.stdout.splitlines() if line.startswith(b'[')]
   assert [[x['rule'] for x in g] for g in groups]==[['R_FIRST','R_SECOND']*2]*3,groups
-  run=json.loads(sarif.read_text())['runs'][0]
+  run=json.loads(sarif.read_text(encoding='utf-8'))['runs'][0]
   assert [r['ruleId'] for r in run['results']]==['R_FIRST','R_SECOND']*2,run
   assert [r['id'] for r in run['tool']['driver']['rules']]==['R_FIRST','R_SECOND'],run
   print('PASS real lmok single/builder/reuse/roles/part/global/check/findings/SARIF flows')

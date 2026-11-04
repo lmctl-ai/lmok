@@ -56,7 +56,7 @@ class Injections(unittest.TestCase):
         pack=Path(self.tmp.name)/'rules.json'
         pack.write_text(json.dumps({'lang':'lmcode','rules':[
             {'id':'INNER','on':'identifier','text_matches':'^inner$','message':'{text}','fix':'renamed'},
-            {'id':'CALL','query':'(call_expression (identifier) @name)','message':'{text}'}]}))
+            {'id':'CALL','query':'(call_expression (identifier) @name)','message':'{text}'}]}), encoding='utf-8')
         out=self.run_host('lint',pack,self.path)
         rows=[json.loads(x) for x in out.splitlines() if x.startswith(b'{')]
         self.assertEqual([(r['rule'],r['row'],r['col'],r['end_col'],r['message']) for r in rows],[('INNER',3,3,8,'inner'),('CALL',3,27,33,'helper')])
@@ -94,9 +94,9 @@ class Injections(unittest.TestCase):
 
     def test_project_ci_and_pack_author_dispatch(self):
         pack=Path(self.tmp.name)/'rules.json'
-        pack.write_text(json.dumps({'lang':'lmcode','rules':[{'id':'INNER','on':'function_declaration','message':'inner'}]}))
+        pack.write_text(json.dumps({'lang':'lmcode','rules':[{'id':'INNER','on':'function_declaration','message':'inner'}]}), encoding='utf-8')
         config=Path(self.tmp.name)/'config.json'
-        config.write_text(json.dumps({'packs':{'lmcode':['rules.json']}}))
+        config.write_text(json.dumps({'packs':{'lmcode':['rules.json']}}), encoding='utf-8')
         out=self.run_host('ci','--config',config,Path(self.tmp.name))
         rows=[json.loads(x) for x in out.splitlines() if x.startswith(b'{')]
         self.assertEqual([(r['row'],r['col'],r['rule']) for r in rows if 'row' in r],[(3,0,'INNER'),(7,8,'INNER')])

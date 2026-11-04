@@ -29,18 +29,18 @@ class EntryChecks(unittest.TestCase):
         self.scratch = tempfile.TemporaryDirectory(prefix='entry-test-', dir=ROOT / 'build')
         self.work = Path(self.scratch.name)
         self.source = self.work / 'input.json'
-        self.source.write_text('{"a":1,"b":2}')
+        self.source.write_text('{"a":1,"b":2}', encoding='utf-8')
     def tearDown(self):
         self.scratch.cleanup()
     def compile(self, body):
         src = self.work / 'rules.lms'
         binary = self.work / 'rules.dslb'
-        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\n')
-        r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(src), str(binary)], capture_output=True, text=True)
+        src.write_text('p = _lmcode_ schema=' + json.dumps(str(ROOT / 'schema/lmok.dsl.json')) + ';\n' + body + '\nend _lmcode_\n', encoding='utf-8')
+        r = subprocess.run(["node",str(ROOT/"scripts/compile-fixture.mjs"), str(src), str(binary)], capture_output=True, text=True, encoding='utf-8', errors='replace')
         self.assertEqual(r.returncode, 0, r.stderr)
         return binary
     def run_host(self, binary, *files, lang='json'):
-        return subprocess.run([HOST, 'check', '--lang', lang, str(binary), *(str(f) for f in (files or (self.source,)))], capture_output=True, text=True)
+        return subprocess.run([HOST, 'check', '--lang', lang, str(binary), *(str(f) for f in (files or (self.source,)))], capture_output=True, text=True, encoding='utf-8', errors='replace')
     def arrays(self, result):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(result.stderr, '')
@@ -61,7 +61,7 @@ class EntryChecks(unittest.TestCase):
         binary = self.compile('@null fn ignored(n: Node) -> void implements Rule { ts.report(n, "wrong"); }')
         self.assertEqual(self.arrays(self.run_host(binary)), [[]])
     def test_anonymous_keyword_kind(self):
-        self.source.write_text('int f(void) { if (1) return 0; return 1; }')
+        self.source.write_text('int f(void) { if (1) return 0; return 1; }', encoding='utf-8')
         binary = self.compile('@if fn keyword(n: Node) -> void implements Rule { if (!n.is_named()) { ts.report(n, n.text(), "KW", "minor"); } }')
         findings = self.arrays(self.run_host(binary, lang='c'))[0]
         self.assertEqual([(f['rule'],f['message']) for f in findings], [('KW','if')])
@@ -104,13 +104,13 @@ class EntryChecks(unittest.TestCase):
         self.assertIn("duplicate entry name 'first'",json.loads(r.stdout.splitlines()[-2])['message'])
     def test_parent_chains_do_not_exhaust_node_handles(self):
         # WP14 F4: a rule walking n.parent() for every array used to allocate depth^2 handles; depth 5000 hit the 1<<20 cap.
-        self.source.write_text('[' * 5000 + ']' * 5000)
+        self.source.write_text('[' * 5000 + ']' * 5000, encoding='utf-8')
         binary = self.compile('@array fn depth(n: Node) -> void implements Rule { let d = 0; let c = n; while (c.has_parent()) { c = c.parent(); d = d + 1; } if (d == 4999) { ts.report(n, "deepest", "DEEP", "minor"); } }')
         findings = self.arrays(self.run_host(binary))[0]
         self.assertEqual([f['rule'] for f in findings], ['DEEP'])
     def test_missing_nodes_are_detectable(self):
         # WP14 F8: a MISSING placeholder dispatches as its expected kind with zero width; Node.is_missing tells it apart.
-        self.source.write_text('{"a": 1, "b": }')
+        self.source.write_text('{"a": 1, "b": }', encoding='utf-8')
         binary = self.compile('@number fn num(n: Node) -> void implements Rule { ts.report(n, "missing=" + str(n.is_missing()), "NUM", "minor"); }')
         findings = self.arrays(self.run_host(binary))[0]
         self.assertEqual([f['message'] for f in findings], ['missing=false', 'missing=true'])
@@ -122,19 +122,19 @@ class EntryChecks(unittest.TestCase):
         error = json.loads(r.stdout.splitlines()[-2])
         self.assertEqual((error['phase'], error['code']), ('load', 'LOAD_UNBOUND'))
         self.assertIn("annotation '@typo_kind_that_does_not_exist' is not a node kind of the json grammar", error['message'])
-        self.source.write_text('int f(void) { return 1; }')
+        self.source.write_text('int f(void) { return 1; }', encoding='utf-8')
         binary = self.compile('@expression fn abstract(n: Node) -> void implements Rule { ts.report(n, "never"); }')
         r = self.run_host(binary, lang='c')
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
         self.assertIn("'@expression' is a supertype of the c grammar", json.loads(r.stdout.splitlines()[-2])['message'])
         # Concrete kinds keep working: the ERROR kind, an anonymous token and a named node.
-        self.source.write_text('{"a" 1}')
+        self.source.write_text('{"a" 1}', encoding='utf-8')
         binary = self.compile('@ERROR fn e(n: Node) -> void implements Rule { ts.report(n, "error", "E", "major"); }\n@document fn d(n: Node) -> void implements Rule { ts.report(n, "doc", "D", "info"); }')
         findings = self.arrays(self.run_host(binary))[0]
         self.assertEqual(sorted(f['rule'] for f in findings), ['D', 'E'])
     def test_each_group_names_its_file(self):
         # WP14 F6: consumers must not have to correlate groups with the argument list by position.
-        other = self.work / 'other.json'; other.write_text('{"c":3}')
+        other = self.work / 'other.json'; other.write_text('{"c":3}', encoding='utf-8')
         binary = self.compile('@pair fn p(n: Node) -> void implements Rule { ts.report(n, "pair", "P", "minor"); }')
         r = self.run_host(binary, self.source, other)
         self.arrays(r)

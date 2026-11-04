@@ -67,12 +67,13 @@ public:
     using namespace invocation_detail;
     bool mode_known=false,dry_mode=false;
     try{
-      auto root=parse(raw);keys(root,{"version","mode","dry","parts"});
+      auto root=parse(raw);if(root.kind!=Kind::Object)metadata_error("object required");
       const auto*version=member(root,"version"),*mode=member(root,"mode"),*dry=member(root,"dry"),*parts=member(root,"parts");
       if(!version||!integer(*version)||integer_value(*version)!=1)metadata_error("unsupported version");
       if(!mode||mode->kind!=Kind::String||(mode->text!="single"&&mode->text!="builder"))metadata_error("invalid mode");
       if(!dry||dry->kind!=Kind::Bool)metadata_error("dry must be boolean");
       mode_known=true;dry_mode=dry->boolean;
+      keys(root,{"version","mode","dry","parts"});
       if(!parts||parts->kind!=Kind::Array||parts->array.empty()||(mode->text=="single"&&parts->array.size()!=1))metadata_error("invalid parts");
       std::vector<std::string> files;
       for(size_t i=0;i<parts->array.size();++i){

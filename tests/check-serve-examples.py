@@ -58,11 +58,11 @@ server = subprocess.Popen([HOST, 'serve', '--port', '0', '--port-file', str(port
                           cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 try:
     deadline = time.time() + 20
-    while not (port_file.exists() and port_file.read_text().strip()):
+    while not (port_file.exists() and port_file.read_text(encoding='utf-8').strip()):
         if time.time() > deadline or server.poll() is not None:
             raise SystemExit('server did not start')
         time.sleep(0.05)
-    base = f'http://127.0.0.1:{port_file.read_text().strip()}'
+    base = f'http://127.0.0.1:{port_file.read_text(encoding='utf-8').strip()}'
     env['LMOK_SERVER'] = base
     remote_call = f'run_lmcode(p, {{command:[{lms_string(HOST)}, "remote", "--lmcode", "$DSLFILE"]}})'
 

@@ -12,8 +12,8 @@ import tempfile
 
 host = str(Path(sys.argv[1]).resolve())
 repo = Path(__file__).resolve().parent.parent
-schema = (repo / 'docs/tier3/db-design.md').read_text().split('```sql\n', 1)[1].split('```', 1)[0]
-embedded = (repo / 'cpp/db.cpp').read_text().split('R"LMOKSQL(\n', 1)[1].split(')LMOKSQL"', 1)[0]
+schema = (repo / 'docs/tier3/db-design.md').read_text(encoding='utf-8').split('```sql\n', 1)[1].split('```', 1)[0]
+embedded = (repo / 'cpp/db.cpp').read_text(encoding='utf-8').split('R"LMOKSQL(\n', 1)[1].split(')LMOKSQL"', 1)[0]
 assert embedded == schema, 'embedded schema must remain verbatim, including FTS and indexes'
 
 @contextmanager
@@ -116,7 +116,7 @@ with tempfile.TemporaryDirectory(prefix='lmok-db-') as tmp:
     r = run('--init', cwd=child)
     assert f'db: {(project / ".lmok/lmok.db").as_posix()}\n' in r.stdout
     (project / '.git').rmdir()
-    (project / '.git').write_text('gitdir: elsewhere\n')
+    (project / '.git').write_text('gitdir: elsewhere\n', encoding='utf-8')
     assert run(cwd=child).stdout == r.stdout
     local = project / 'a' / '.lmok'
     local.mkdir()
@@ -136,7 +136,7 @@ with tempfile.TemporaryDirectory(prefix='lmok-db-') as tmp:
     r = run(cwd=outside, extra_env={'XDG_CACHE_HOME': '', 'HOME': str(root / 'home-é-水')}, code=2)
     assert default_cache.as_posix() in r.stderr and not (root / 'home-é-水').exists()
     if os.name != 'nt' and Path('/dev/full').exists():
-        with open('/dev/full', 'w') as full:
+        with open('/dev/full', 'w', encoding='utf-8') as full:
             r = subprocess.run([host, 'status', '--db', str(expected_db)], stdout=full, stderr=subprocess.PIPE)
             assert r.returncode == 4
 print('DB contracts: exact schema/FTS5, counts, last run, mismatch, precedence, no read creation, stdout errors')
