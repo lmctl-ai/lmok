@@ -53,6 +53,15 @@ nonzero process exit status.
 - `parse-string.lms` — parse an inline JSON string, print the tree
 - `parse-file.lms` — read [examples/data/sample.json](../examples/data/sample.json), print tree stats
 - `detect-error.lms` — parse malformed JSON, flag the ERROR node
+- `rest-endpoint-inventory.lms` — a real-world Java use case: parse
+  [examples/data/sample-rest-endpoints.java](../examples/data/sample-rest-endpoints.java)
+  with `ts.parse_java`, query it with `ts.query_java` (the JSON-only generic `ts.query`
+  does not work on a Java tree — it fails with a `node-type` error even on a valid
+  Java query pattern), extract the class-level `@Path` prefix plus each method's route,
+  HTTP verb and whether a marker annotation like `@Unauthenticated` is present. Shows
+  `Node.parent()` used to re-scope a second, narrower `ts.query_java` call onto one
+  already-matched method, which is how to correlate a method with its own annotations
+  without recursion.
 - `cst-rules.lms` — two `@`-annotated rules `implements Rule` over the JSON CST
   (`Tree.root()` + `Node` navigation with manual fixed-depth loops)
 - `lint-json.lms` — a tiny JSON linter: three annotated rules run over

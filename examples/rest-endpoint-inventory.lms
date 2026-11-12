@@ -1,0 +1,64 @@
+# Chapter: Java - inventory REST routes and flag unauthenticated ones
+# Shows: ts.parse_java, ts.query_java (per-language query, NOT the generic ts.query),
+#        #eq? predicates, Node.parent() to re-scope a query onto one method
+# Run: lmscript examples/rest-endpoint-inventory.lms
+# Needs: README setup; repo root, build/ present, lmok on PATH; offline after setup.
+# Data: reads examples/data/sample-rest-endpoints.java, run from the repository root.
+# exit: 0
+# expect:
+#|class route captures: 2
+#|prefix -> "/accounts"
+#|methods found: 3
+#|GET "/profile" -> getProfile [authenticated]
+#|GET "/health" -> getHealth [UNAUTHENTICATED]
+#|GET "/status" -> getStatus [UNAUTHENTICATED]
+p = _lmcode_ cli="lmok" install="github:lmctl-ai/lmok@latest";
+
+# A common real-world question: "what HTTP routes does this interface expose, and
+# which of them skip authentication?" JAX-RS-style code marks routes with @Path (an
+# `annotation` node, since it takes an argument) and marks auth-exempt methods with a
+# project-specific marker annotation like @Unauthenticated (a `marker_annotation`
+# node, since it takes none). A tree parsed with ts.parse_java must be queried with
+# ts.query_java, not the generic ts.query (that one assumes the JSON grammar and
+# fails on any other language's node types, e.g. with a confusing "node-type" error
+# on a perfectly valid Java query pattern).
+
+let text = file_read("examples/data/sample-rest-endpoints.java");
+let tree = ts.parse_java(text);
+
+# The class-level @Path prefix.
+let classRoute = ts.query_java(tree.root(), "(interface_declaration (modifiers (annotation name: (identifier) @ann arguments: (annotation_argument_list (string_literal) @route))) (#eq? @ann \"Path\"))");
+println("class route captures: " + str(classRoute.len()));
+if (classRoute.len() > 1) {
+  println("prefix -> " + classRoute.at(1).text());
+}
+
+# Every method, by name; Node.parent() on the captured @name identifier gets back to
+# its enclosing method_declaration, which can then be used as the root of a second,
+# narrower query — the same "re-scope ts.query_java onto one match" idiom used to
+# correlate a method with its own annotations without any recursion.
+let names = ts.query_java(tree.root(), "(method_declaration name: (identifier) @name)");
+println("methods found: " + str(names.len()));
+
+for (nameNode in names) {
+  let methodNode = nameNode.parent();
+  let methodName = nameNode.text();
+
+  let verbs = ts.query_java(methodNode, "(marker_annotation name: (identifier) @v (#eq? @v \"GET\"))");
+  let auth = ts.query_java(methodNode, "(marker_annotation name: (identifier) @u (#eq? @u \"Unauthenticated\"))");
+  let routes = ts.query_java(methodNode, "(annotation name: (identifier) @ann arguments: (annotation_argument_list (string_literal) @route) (#eq? @ann \"Path\"))");
+
+  let verb = "?";
+  if (verbs.len() > 0) { verb = "GET"; }
+  let route = "(none)";
+  if (routes.len() > 1) { route = routes.at(1).text(); }
+  let unauth = "authenticated";
+  if (auth.len() > 0) { unauth = "UNAUTHENTICATED"; }
+
+  println(verb + " " + route + " -> " + methodName + " [" + unauth + "]");
+}
+
+end _lmcode_
+
+r = run_lmcode(p);
+assert(r.ok, "lmcode host failed");
