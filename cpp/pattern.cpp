@@ -184,7 +184,7 @@ CompiledPattern compile_pattern(Grammar grammar, const std::string &pattern) {
   bool wrapped = false;
   if (has_error_node(ts_of(node_root(tree))) && grammar == Grammar::C) {
     // C forbids most statements and bare expressions at file scope: retry with ';' and then inside a function body.
-    for (const std::string candidate : {source + ";", "void __lmok_wrap(void) {" + source + "}", "void __lmok_wrap(void) {" + source + ";}"}) {
+    for (const std::string &candidate : {source + ";", "void __lmok_wrap(void) {" + source + "}", "void __lmok_wrap(void) {" + source + ";}"}) {
       Tree retry = parse(grammar, candidate);
       if (!has_error_node(ts_of(node_root(retry)))) { tree = std::move(retry); text = candidate; wrapped = candidate.compare(0, 5, "void ") == 0; break; }
     }

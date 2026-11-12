@@ -67,6 +67,43 @@ with tempfile.TemporaryDirectory(prefix='lmok-find-') as temp:
         for bad in ['foo(', '"unclosed', 'foo OR', 'bogus:foo']:
             p = find(bad, '--fts', code=2)
             assert b'invalid FTS5 query' in p.stderr and not p.stdout, p
+        # Regression: unquoted code tokens with '@', '.', '-', '#', '$', '::', etc. in --fts.
+        (root / 'src/Auth.java').write_bytes((
+            'package demo;\n'
+            'import demo.Unauthenticated;\n'
+            '// Unauthenticated comment\n'
+            'public class Auth {\n'
+            '    @Unauthenticated\n'
+            '    public void login() {}\n'
+            '    @Pointcut("@annotation(demo.Unauthenticated)")\n'
+            '    public void pc() {}\n'
+            '    @RolesAllowed("admin")\n'
+            '    public void admin() {}\n'
+            '    // tree-sitter #include $var std::vector<int> name="val" --limit\n'
+            '}\n'
+        ).encode())
+        run('index', 'src', '--db', 'index.db')
+        at_hit = b'src/Auth.java:4:4:     @Unauthenticated\n'
+        res = find('@Unauthenticated', '--fts')
+        assert res.stdout == at_hit and not res.stderr, res
+        assert find('@Unauth*', '--fts').stdout == at_hit
+        assert find('text:@Unauthenticated', '--fts').stdout == at_hit
+        assert find('@Unauthenticated OR @RolesAllowed', '--fts').stdout == (
+            at_hit + b'src/Auth.java:8:4:     @RolesAllowed("admin")\n'
+        )
+        assert find('NEAR(@Unauthenticated login, 30)', '--fts').stdout == (
+            at_hit + b'src/Auth.java:5:16:     public void login() {}\n'
+        )
+        for literal_tok in ['@Unauthenticated', 'demo.Unauthenticated', 'tree-sitter',
+                            '#include', '$var', 'std::vector<int>', 'name="val"']:
+            fts_res = find(literal_tok, '--fts')
+            lit_res = find(literal_tok)
+            assert fts_res.stdout == lit_res.stdout and fts_res.stdout and not fts_res.stderr, (literal_tok, fts_res, lit_res)
+        dash_fts = run('find', '--db', 'index.db', '--fts', '--', '--limit')
+        assert dash_fts.stdout == run('find', '--db', 'index.db', '--', '--limit').stdout and dash_fts.stdout
+        for bad in ['-bogus:@Unauthenticated', '@"unclosed']:
+            p = find(bad, '--fts', code=2)
+            assert b'invalid FTS5 query' in p.stderr and not p.stdout, p
     elif mode == 'limit':
         first = b'src/a.c:0:3: // foo( foo( food\n'
         p = find('foo(', '--limit', '1')

@@ -42,6 +42,183 @@ std::string quote_phrase(const std::string &s) {
   for (char ch : s) { result += ch; if (ch == '"') result += ch; }
   return result + '"';
 }
+bool is_fts_space(char ch) {
+  return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
+}
+bool is_fts_bareword(char ch) {
+  const auto u = static_cast<unsigned char>(ch);
+  return u >= 0x80 || (u >= '0' && u <= '9') || (u >= 'A' && u <= 'Z') ||
+         (u >= 'a' && u <= 'z') || u == '_' || u == 0x1a;
+}
+bool is_all_bareword(const std::string &s, size_t begin, size_t end) {
+  if (begin >= end) return false;
+  for (size_t i = begin; i < end; ++i)
+    if (!is_fts_bareword(s[i])) return false;
+  return true;
+}
+bool is_fts_keyword(const std::string &tok) {
+  return tok == "AND" || tok == "OR" || tok == "NOT";
+}
+size_t scan_quoted(const std::string &s, size_t start, bool &closed) {
+  closed = false;
+  size_t j = start + 1;
+  while (j < s.size()) {
+    if (s[j] == '"') {
+      ++j;
+      if (j < s.size() && s[j] == '"') { ++j; continue; }
+      closed = true;
+      return j;
+    }
+    ++j;
+  }
+  return j;
+}
+bool is_single_colon(const std::string &s, size_t pos) {
+  if (pos >= s.size() || s[pos] != ':') return false;
+  if (pos > 0 && s[pos - 1] == ':') return false;
+  if (pos + 1 < s.size() && s[pos + 1] == ':') return false;
+  if (pos + 2 < s.size() && s[pos + 1] == '/' && s[pos + 2] == '/') return false;
+  return true;
+}
+bool is_fts_col_minus(const std::string &s, size_t pos) {
+  size_t j = pos + 1;
+  while (j < s.size() && is_fts_space(s[j])) ++j;
+  if (j >= s.size()) return false;
+  if (s[j] == '{') return true;
+  if (s[j] == '"') {
+    bool closed = false;
+    j = scan_quoted(s, j, closed);
+    if (!closed) return false;
+  } else if (is_fts_bareword(s[j])) {
+    const size_t start = j;
+    while (j < s.size() && is_fts_bareword(s[j])) ++j;
+    if (is_fts_keyword(s.substr(start, j - start))) return false;
+  } else {
+    return false;
+  }
+  while (j < s.size() && is_fts_space(s[j])) ++j;
+  return is_single_colon(s, j);
+}
+bool is_fts_plus(const std::string &s, size_t pos, bool after_phrase) {
+  if (!after_phrase) return false;
+  if (pos > 0 && s[pos - 1] == '+') return false;
+  if (pos + 1 < s.size() && s[pos + 1] == '+') return false;
+  size_t j = pos + 1;
+  while (j < s.size() && is_fts_space(s[j])) ++j;
+  if (j >= s.size()) return false;
+  return is_fts_bareword(s[j]) || s[j] == '"' || s[j] == '@';
+}
+bool is_fts_caret(const std::string &s, size_t pos) {
+  if (pos + 1 >= s.size()) return false;
+  const char next = s[pos + 1];
+  return is_fts_bareword(next) || next == '"' || next == '@';
+}
+// SQLite FTS5 only accepts [A-Za-z0-9_\x1a] and non-ASCII bytes in unquoted
+// barewords, rejecting common code tokens like `@Unauthenticated`, `pkg.Type`,
+// `tree-sitter`, `#include`, `$var`, or `std::vector` as query syntax errors.
+// Quote unquoted literal code tokens while preserving FTS5 query operators.
+std::string normalize_fts_query(const std::string &s) {
+  std::string out;
+  out.reserve(s.size() + 8);
+  bool can_precede_colon = false;
+  bool after_phrase = false;
+  for (size_t i = 0; i < s.size();) {
+    if (is_fts_space(s[i])) {
+      out += s[i++];
+      continue;
+    }
+    if (s[i] == '"') {
+      bool closed = false;
+      const size_t j = scan_quoted(s, i, closed);
+      out.append(s, i, j - i);
+      i = j;
+      if (closed && i < s.size() && s[i] == '*' &&
+          (i + 1 == s.size() || is_fts_space(s[i + 1]) || s[i + 1] == ')' || s[i + 1] == ',')) {
+        out += s[i++];
+        can_precede_colon = false;
+        after_phrase = true;
+      } else {
+        can_precede_colon = closed;
+        after_phrase = closed;
+      }
+      continue;
+    }
+    if (s[i] == '(' || s[i] == ')' || s[i] == '{' || s[i] == '}' || s[i] == ',') {
+      const char ch = s[i++];
+      out += ch;
+      can_precede_colon = (ch == '}');
+      after_phrase = false;
+      continue;
+    }
+    if (s[i] == ':' && can_precede_colon && is_single_colon(s, i)) {
+      out += s[i++];
+      can_precede_colon = false;
+      after_phrase = false;
+      continue;
+    }
+    if (s[i] == '-' && is_fts_col_minus(s, i)) {
+      out += s[i++];
+      can_precede_colon = false;
+      after_phrase = false;
+      continue;
+    }
+    if (s[i] == '^' && is_fts_caret(s, i)) {
+      out += s[i++];
+      can_precede_colon = false;
+      after_phrase = false;
+      continue;
+    }
+    if (s[i] == '+' && is_fts_plus(s, i, after_phrase)) {
+      out += s[i++];
+      can_precede_colon = false;
+      after_phrase = false;
+      continue;
+    }
+    std::string tok;
+    size_t j = i;
+    while (j < s.size()) {
+      const char ch = s[j];
+      if (is_fts_space(ch) || ch == '(' || ch == ')' || ch == '{' || ch == '}' || ch == ',') break;
+      if (ch == '"') {
+        bool closed = false;
+        const size_t end_q = scan_quoted(s, j, closed);
+        if (!closed) break;
+        tok.append(s, j, end_q - j);
+        j = end_q;
+        continue;
+      }
+      if (ch == ':' && j > i && j - i == tok.size() &&
+          is_all_bareword(tok, 0, tok.size()) && !is_fts_keyword(tok) &&
+          is_single_colon(s, j)) {
+        break;
+      }
+      if (ch == '+' && j > i && j - i == tok.size() &&
+          is_all_bareword(tok, 0, tok.size()) && !is_fts_keyword(tok) &&
+          is_fts_plus(s, j, true)) {
+        break;
+      }
+      tok += ch;
+      ++j;
+    }
+    i = j;
+    bool prefix_star = false;
+    if (tok.size() >= 2 && tok.back() == '*' && is_fts_bareword(tok[tok.size() - 2])) {
+      prefix_star = true;
+      tok.pop_back();
+    }
+    const bool pure_bare = is_all_bareword(tok, 0, tok.size());
+    const bool kw = !prefix_star && pure_bare && is_fts_keyword(tok);
+    if (pure_bare && !(prefix_star && is_fts_keyword(tok))) {
+      out += tok;
+    } else {
+      out += quote_phrase(tok);
+    }
+    if (prefix_star) out += '*';
+    can_precede_colon = pure_bare && !kw && !prefix_star;
+    after_phrase = !kw && !(pure_bare && !prefix_star && tok == "NEAR");
+  }
+  return out;
+}
 
 // FTS5 has no offsets() function. Its extension API supplies phrase-instance
 // token positions; tokenize the stored column to map those to original bytes.
@@ -140,7 +317,7 @@ int find_text(Database &db, const FindOptions &options, std::ostream &out, std::
   else if (options.fts && !trigram)
     err << "find: legacy word-token FTS5 semantics; run `lmok index` for trigram search\n";
   if (options.fts) register_offsets(db);
-  const std::string pattern = options.fts ? options.pattern : quote_phrase(options.pattern);
+  const std::string pattern = options.fts ? normalize_fts_query(options.pattern) : quote_phrase(options.pattern);
   const std::string language = options.lang ? " AND lang=?2" : "";
   std::string sql;
   if (options.fts) {

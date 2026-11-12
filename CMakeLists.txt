@@ -162,9 +162,8 @@ target_compile_definitions(lmok PRIVATE LMOK_VERSION="${PROJECT_VERSION}")
 # Static linking: no runtime dependency beyond the OS C library.
 # ("Clang" also matches AppleClang; macOS has no -static/-static-libstdc++.)
 if((CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang") AND NOT APPLE)
-  target_link_options(lmok PRIVATE -static-libstdc++ -static-libgcc)
   if(LMOK_FULL_STATIC)
-    target_link_options(lmok PRIVATE -static)
+    target_link_options(lmok PRIVATE -static-libstdc++ -static-libgcc -static)
   endif()
 endif()
 

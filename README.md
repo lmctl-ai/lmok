@@ -305,9 +305,11 @@ trigram MATCH narrows candidate files, then original stored bytes are checked
 exactly. Thus `foo(`, `"quoted"`, spaces, and `OR` are literal data, not syntax.
 Use `--` before a pattern starting with `--`.
 
-`--fts` instead passes PATTERN unchanged as an [FTS5 query](https://www.sqlite.org/fts5.html#full_text_query_syntax):
+`--fts` instead interprets PATTERN as an [FTS5 query](https://www.sqlite.org/fts5.html#full_text_query_syntax):
 quoted phrases, AND/OR/NOT, NEAR and prefixes follow SQLite's tokenizer/query
-semantics. Trigram MATCH is case-insensitive by default and terms shorter than
+semantics, while unquoted code tokens containing non-bareword punctuation (such
+as `@Unauthenticated`, `pkg.Type`, `tree-sitter`, `#include`, or `std::vector`)
+are automatically phrase-quoted. Trigram MATCH is case-insensitive by default and terms shorter than
 three Unicode characters do not match. Syntax errors exit 2. Output positions
 are the distinct starts of positive phrase occurrences in matched documents;
 FTS token offsets are mapped back to stored source bytes through the FTS5
