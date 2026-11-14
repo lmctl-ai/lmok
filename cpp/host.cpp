@@ -332,6 +332,8 @@ std::string node_text(const Node &node) {
 
 bool node_is_named(const Node &node) { return ts_node_is_named(ts(node)); }
 bool node_is_missing(const Node &node) { return ts_node_is_missing(ts(node)); }
+bool node_is_error(const Node &node) { return ts_node_is_error(ts(node)); }
+bool node_has_error(const Node &node) { return ts_node_has_error(ts(node)); }
 const void *node_id(const Node &node) { return ts(node).id; }
 
 int64_t node_start_row(const Node &node) { return ts_node_start_point(ts(node)).row; }

@@ -21,6 +21,7 @@ Repository: https://github.com/lmctl-ai/lmok.
 | [10-lint-db-findings.md](10-lint-db-findings.md) | lint --db run recording + supersession, findings verb, DB-create/side-channel decisions |
 | [11-pattern-rules.md](11-pattern-rules.md) | Code-shaped (semgrep-style) patterns compiled to queries: `query --pattern`, pack `pattern` fields, `ts.match_*`, corner cases |
 | [12-autofix.md](12-autofix.md) | Whole-node fix metadata, verified edits and unified previews |
+| [refactor.md](refactor.md) | Global structural replacement, scope-aware rename, import rewrite, safety and dry-run/apply contract |
 | [13-baseline-sarif.md](13-baseline-sarif.md) | lint --new-since/--baseline/--changed/--fail-on-new keying, findings.snippet column, host --sarif on lint/check/ci |
 | [16-review-mainline-wave.md](16-review-mainline-wave.md) | Independent review of the bef3003..065a833 wave: index-after-lint fix, --changed hardening, bootstrap publish, import bindings, L notes |
 | [17-sdk-sync-and-flag-sweep.md](17-sdk-sync-and-flag-sweep.md) | SDK at lmcode-cpp origin/main, retired-flag sweep scope (rules/fixtures keep them), utf-8 test I/O, shared compiler probe |

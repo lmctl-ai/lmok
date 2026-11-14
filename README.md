@@ -862,6 +862,43 @@ are in `tests/check-autofix.py`, run by `./test.sh` on every platform. Fix metad
 is available in current lint/check output; historical DB findings keep their
 existing position/message schema.
 
+## Global refactoring
+
+`lmok refactor` performs multi-file, CST-verified structural replacement, scope-aware
+symbol renaming, and import/header rewriting without requiring an IDE. **Dry-run is
+the default**: it computes and verifies every edit in memory and prints a
+`git apply`-compatible unified diff to stdout (with match count and deterministic
+16-hex plan digest on stderr) while leaving all workspace files untouched. Pass
+`--apply` to execute the verified changes atomically per file (with multi-file
+preflight rollback; undo via `git checkout` or `git diff`).
+
+```sh
+# 1. Pattern rewrite with variadic args and preview (dry-run by default)
+build/lmok refactor -p 'log_msg($FMT, $...ARGS)' --to 'emit(LOG_INFO, $FMT, $...ARGS)' src/
+
+# 2. Apply changes after inspecting diff (or pipe diff into `git apply`)
+build/lmok refactor -p 'old_api($A, $B)' --to 'new_api($B, $A)' --apply src/
+
+# 3. Cursor-targeted local rename (excludes inner-shadowed bindings and member fields)
+build/lmok refactor --rename count --at src/app.cpp:14:9 --to total src/app.cpp --apply
+
+# 4. C++ class/constructor/destructor/header rename and gated method rename
+build/lmok refactor --rename Widget --to Panel --kind class --header-lang cpp include/ src/ --apply
+build/lmok refactor --rename draw --to render --kind method --scope Panel src/ --exact-only --apply
+
+# 5. Header/import path rewrite and sequential JSON codemod packs
+build/lmok refactor --import legacy/old.h --to core/new.h src/ --apply
+build/lmok refactor --rules codemods/migrate.json src/ --format json
+```
+
+Supported code-pattern grammars: `c`, `cpp`, `python`, `java`, `go`, `javascript`,
+`typescript`, and `tsx` (`--rename` / `--import` also respect CST comments and string
+boundaries). Key options: `--inside PAT`, `--not-inside PAT`, `--where VAR~REGEX`,
+`--changed[=REV]`, `--git-clean`, `--format diff|sites|json` (`--sites`, `--json`),
+`--check` (exit 1 when edits pending), `--expect DIGEST`, `--expect-sites N`,
+`--drop-comments`, `--skip-unsafe`, and `--strict-parse`. See
+[refactor behavior and controls](durable-memory/refactor.md) and `tests/check-refactor.py`.
+
 ## Local metrics and duplication
 
 `lmok metrics src/` prints JSON Lines with `file`, physical `lines`, `functions`

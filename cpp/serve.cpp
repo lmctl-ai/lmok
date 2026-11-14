@@ -1396,6 +1396,7 @@ private:
     if (verb == "parse" || verb == "query" || verb == "facts" || verb == "metrics" || verb == "dup" || verb == "rules" || verb == "test") return true;
     if (verb == "outline") return !has("--db");
     if (verb == "lint") return !has("--db") && !has("--fix") && !has("--diff") && !has("--sarif") && !has("--changed") && !has("--new-since") && !has("--baseline");
+    if (verb == "refactor") return !has("--apply") && !has("--changed") && !has("--git-clean");
     if (verb == "check") return !has("--sarif");
     if (verb == "--lmcode" || verb == "--first" || verb == "--last") return setting_bool(settings_, "cache_lmcode") && !has("--db");
     return false;

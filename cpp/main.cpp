@@ -10,6 +10,7 @@
 #include "project_config.hpp"
 #include "project_ci.hpp"
 #include "pattern.hpp"
+#include "refactor.hpp"
 #include "facts.hpp"
 #include "metrics.hpp"
 #include "input.hpp"
@@ -747,6 +748,9 @@ static int run_cli(int argc, char **argv) {
       "       lmok rules PACK... | test PACK FIXTURE...\n"
       "       lmok lint RULES.json FILE|DIR... [--db PATH] [--header-lang c|cpp] [--no-suppress] [--sarif FILE] [--fix|--diff]\n"
       "               [--new-since RUN|--baseline FILE] [--fail-on-new] [--changed[=REV]]\n"
+      "       lmok refactor (--pattern PAT --to TMPL | --rename OLD --to NEW | --at FILE:LINE:COL --to NEW | --import OLD --to NEW | --rules FILE)\n"
+      "               [--inside PAT] [--not-inside PAT] [--where VAR~REGEX] [--kind K] [--scope S] [--allow-candidates|--exact-only]\n"
+      "               [--lang L] [--header-lang c|cpp] [--changed[=REV]] [--format diff|sites|json] [--apply] [--check] [FILE|DIR...]\n"
       "       lmok outline FILE|DIR... [--db PATH] [--budget N] [--header-lang c|cpp]\n"
       "       lmok facts [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--header-lang c|cpp] FILE|DIR...\n"
       "       lmok check [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--header-lang c|cpp] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
@@ -768,6 +772,207 @@ static int run_cli(int argc, char **argv) {
       for(const auto &item:catalog){const auto &r=item.second;std::cout<<"{\"id\":"<<lmok::meta_quote(r.id)<<",\"lang\":"<<lmok::meta_quote(lmok::grammar_name(r.grammar))<<",\"severity\":"<<lmok::meta_quote(r.severity)<<",\"metadata\":"<<r.metadata.json()<<"}\n";}
       return std::cout?0:4;
     }catch(const std::exception &e){std::cerr<<e.what()<<"\n";return 2;}
+  }
+  if (argc >= 2 && std::string(argv[1]) == "refactor") {
+    lmok::RefactorOptions opts;
+    bool mode_pattern = false, mode_rename = false, mode_import = false, mode_rules = false;
+    bool to_seen = false, at_seen = false, lang_seen = false, header_lang_seen = false;
+    bool changed = false;
+    std::string changed_rev = "HEAD";
+    HeaderLang header_lang = HeaderLang::C;
+    std::vector<std::string> target_args;
+    const auto parse_nonneg = [](const std::string &s, size_t &out) -> bool {
+      if (s.empty()) return false;
+      const char *begin = s.data(), *end = begin + s.size();
+      auto res = std::from_chars(begin, end, out);
+      return res.ec == std::errc() && res.ptr == end;
+    };
+    const auto parse_pos_int64 = [](const std::string &s, int64_t &out) -> bool {
+      if (s.empty()) return false;
+      const char *begin = s.data(), *end = begin + s.size();
+      auto res = std::from_chars(begin, end, out);
+      return res.ec == std::errc() && res.ptr == end && out > 0;
+    };
+    for (int i = 2; i < argc; ++i) {
+      const std::string arg = argv[i];
+      if ((arg == "--pattern" || arg == "-p") && i + 1 < argc) {
+        if (mode_pattern) { std::cerr << "refactor: duplicate --pattern\n"; return 2; }
+        mode_pattern = true;
+        opts.mode = lmok::RefactorMode::Pattern;
+        opts.from = argv[++i];
+      } else if (arg == "--rename" && i + 1 < argc) {
+        if (mode_rename) { std::cerr << "refactor: duplicate --rename\n"; return 2; }
+        mode_rename = true;
+        opts.mode = lmok::RefactorMode::Rename;
+        opts.from = argv[++i];
+      } else if (arg == "--import" && i + 1 < argc) {
+        if (mode_import) { std::cerr << "refactor: duplicate --import\n"; return 2; }
+        mode_import = true;
+        opts.mode = lmok::RefactorMode::Import;
+        opts.from = argv[++i];
+      } else if (arg == "--rules" && i + 1 < argc) {
+        if (mode_rules) { std::cerr << "refactor: duplicate --rules\n"; return 2; }
+        mode_rules = true;
+        opts.mode = lmok::RefactorMode::Rules;
+        opts.from = argv[++i];
+      } else if ((arg == "--to" || arg == "--replace") && i + 1 < argc) {
+        if (to_seen) { std::cerr << "refactor: duplicate --to/--replace\n"; return 2; }
+        to_seen = true;
+        opts.to = argv[++i];
+      } else if (arg == "--inside" && i + 1 < argc) {
+        if (!opts.inside.empty()) { std::cerr << "refactor: duplicate --inside\n"; return 2; }
+        opts.inside = argv[++i];
+      } else if (arg == "--not-inside" && i + 1 < argc) {
+        if (!opts.not_inside.empty()) { std::cerr << "refactor: duplicate --not-inside\n"; return 2; }
+        opts.not_inside = argv[++i];
+      } else if (arg == "--where" && i + 1 < argc) {
+        const std::string clause = argv[++i];
+        const size_t tilde = clause.find('~');
+        if (tilde == std::string::npos || tilde == 0 || tilde + 1 >= clause.size()) {
+          std::cerr << "refactor: --where expects VAR~REGEX\n";
+          return 2;
+        }
+        opts.where_clauses.emplace_back(clause.substr(0, tilde), clause.substr(tilde + 1));
+      } else if (arg == "--at" && i + 1 < argc) {
+        if (at_seen) { std::cerr << "refactor: duplicate --at\n"; return 2; }
+        at_seen = true;
+        const std::string spec = argv[++i];
+        const size_t c2 = spec.rfind(':');
+        const size_t c1 = c2 == std::string::npos ? std::string::npos : spec.rfind(':', c2 == 0 ? 0 : c2 - 1);
+        if (c1 == std::string::npos || c1 == 0 || c2 == std::string::npos || c1 >= c2) {
+          std::cerr << "refactor: --at expects FILE:LINE:COL\n";
+          return 2;
+        }
+        int64_t line = 0, col = 0;
+        if (!parse_pos_int64(spec.substr(c1 + 1, c2 - c1 - 1), line) ||
+            !parse_pos_int64(spec.substr(c2 + 1), col)) {
+          std::cerr << "refactor: --at expects 1-based positive LINE and COL\n";
+          return 2;
+        }
+        opts.rename_at_file = canonical_path(spec.substr(0, c1));
+        opts.rename_at_line = line;
+        opts.rename_at_col = col;
+      } else if (arg == "--kind" && i + 1 < argc) {
+        opts.rename_kind = argv[++i];
+      } else if (arg == "--scope" && i + 1 < argc) {
+        opts.rename_scope = argv[++i];
+      } else if (arg == "--lang" && !lang_seen && i + 1 < argc) {
+        lmok::Grammar g;
+        if (!parse_lang(argv[++i], g)) { std::cerr << usage; return 2; }
+        opts.forced_lang = g;
+        lang_seen = true;
+      } else if (arg == "--header-lang") {
+        if (!consume_header_lang(i, argc, argv, header_lang, header_lang_seen)) {
+          std::cerr << usage;
+          return 2;
+        }
+      } else if (arg == "--changed" && !changed) {
+        changed = true;
+      } else if (arg.rfind("--changed=", 0) == 0 && !changed && arg.size() > 10) {
+        changed = true;
+        changed_rev = arg.substr(10);
+      } else if (arg == "--format" && i + 1 < argc) {
+        const std::string fmt = argv[++i];
+        if (fmt == "diff") opts.format = lmok::RefactorFormat::Diff;
+        else if (fmt == "sites") opts.format = lmok::RefactorFormat::Sites;
+        else if (fmt == "json") opts.format = lmok::RefactorFormat::Json;
+        else { std::cerr << "refactor: unknown --format '" << fmt << "' (want diff|sites|json)\n"; return 2; }
+      } else if (arg == "--sites") {
+        opts.format = lmok::RefactorFormat::Sites;
+      } else if (arg == "--json") {
+        opts.format = lmok::RefactorFormat::Json;
+      } else if (arg == "--context" && i + 1 < argc) {
+        size_t n = 0;
+        if (!parse_nonneg(argv[++i], n)) { std::cerr << "refactor: --context expects a non-negative integer\n"; return 2; }
+        opts.context_lines = n;
+      } else if (arg == "--expect" && i + 1 < argc) {
+        opts.expect_digest = argv[++i];
+      } else if (arg == "--expect-sites" && i + 1 < argc) {
+        size_t n = 0;
+        if (!parse_nonneg(argv[++i], n)) { std::cerr << "refactor: --expect-sites expects a non-negative integer\n"; return 2; }
+        opts.expect_sites = n;
+      } else if (arg == "--apply") {
+        opts.apply = true;
+      } else if (arg == "--check") {
+        opts.check = true;
+      } else if (arg == "--allow-candidates") {
+        opts.allow_candidates = true;
+      } else if (arg == "--exact-only") {
+        opts.exact_only = true;
+      } else if (arg == "--drop-comments") {
+        opts.drop_comments = true;
+      } else if (arg == "--skip-unsafe") {
+        opts.skip_unsafe = true;
+      } else if (arg == "--strict-parse") {
+        opts.strict_parse = true;
+      } else if (arg == "--git-clean") {
+        opts.git_clean = true;
+      } else if (arg.empty() || arg.rfind("-", 0) == 0) {
+        std::cerr << usage;
+        return 2;
+      } else {
+        target_args.push_back(arg);
+      }
+    }
+    if (!mode_pattern && !mode_rename && !mode_import && !mode_rules && at_seen) {
+      mode_rename = true;
+      opts.mode = lmok::RefactorMode::Rename;
+    }
+    const int modes = (mode_pattern ? 1 : 0) + (mode_rename ? 1 : 0) + (mode_import ? 1 : 0) + (mode_rules ? 1 : 0);
+    if (modes != 1) {
+      std::cerr << "refactor: specify exactly one of --pattern, --rename, --at, --import, or --rules\n";
+      return 2;
+    }
+    if (mode_pattern && !to_seen) {
+      std::cerr << "refactor: --pattern requires --to (use --to \"\" to delete)\n";
+      return 2;
+    }
+    if ((mode_rename || mode_import) && !to_seen) {
+      std::cerr << "refactor: --rename and --import require --to\n";
+      return 2;
+    }
+    if (mode_rules && to_seen) {
+      std::cerr << "refactor: --rules cannot be combined with --to\n";
+      return 2;
+    }
+    if (opts.allow_candidates && opts.exact_only) {
+      std::cerr << "refactor: --allow-candidates and --exact-only are mutually exclusive\n";
+      return 2;
+    }
+    if (target_args.empty()) target_args.push_back(".");
+    std::set<std::string> changed_files;
+    if (changed) {
+      try { changed_files = lmok::git_changed_files(changed_rev); }
+      catch (const lmok::BaselineError &e) { std::cerr << e.what() << "\n"; return 2; }
+    }
+    std::vector<Target> targets;
+    if (const int rc = expand_targets(target_args, 0, targets,
+                                      opts.forced_lang ? &*opts.forced_lang : nullptr,
+                                      {}, header_lang)) {
+      return rc;
+    }
+    namespace fs = std::filesystem;
+    std::vector<lmok::RefactorTarget> ref_targets;
+    ref_targets.reserve(targets.size());
+    for (const auto &target : targets) {
+      if (changed) {
+        const std::string absolute =
+            fs::absolute(fs::u8path(target.path)).lexically_normal().generic_u8string();
+        if (!changed_files.count(absolute)) continue;
+      }
+      lmok::Grammar g = lmok::Grammar::Json;
+      if (opts.forced_lang) {
+        g = *opts.forced_lang;
+      } else {
+        const std::string ext = fs::u8path(target.path).extension().u8string();
+        if (!grammar_for_extension(ext, g, header_lang)) {
+          std::cerr << "cannot infer the language of " << target.path << " from its extension (use --lang)\n";
+          return 2;
+        }
+      }
+      ref_targets.push_back({target.path, g, target.from_dir});
+    }
+    return lmok::refactor_run(opts, ref_targets, std::cout, std::cerr);
   }
   if(argc>=2 && std::string(argv[1])=="test"){
     if(argc<4){std::cerr<<"test needs PACK FIXTURE...\n";return 2;}

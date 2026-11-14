@@ -204,6 +204,10 @@ bool node_is_named(const Node &node);
 // True for a zero-width MISSING placeholder tree-sitter inserted for error recovery; it carries the
 // expected kind (e.g. `number`) and empty text, so rules dispatched on that kind can skip it.
 bool node_is_missing(const Node &node);
+// True when the node itself is a tree-sitter ERROR node.
+bool node_is_error(const Node &node);
+// True when the subtree rooted at node contains any ERROR or MISSING node.
+bool node_has_error(const Node &node);
 // Stable identity of the node within its tree (tree-sitter's subtree pointer): equal for every handle
 // of the same node, so a host can hand out one handle per node instead of one per call.
 const void *node_id(const Node &node);

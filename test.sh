@@ -1346,4 +1346,8 @@ ok "lmok serve: buttons, presets, settings, cache, results, remote client, shutd
 python3 tests/check-serve-triage.py "$HOST" || fail "lmok serve triage session"
 ok "lmok serve: scan one file, deep-search related files, refine, fix and re-verify in one session"
 
+# --- Global structural refactoring (`lmok refactor`) ---
+python3 tests/check-refactor.py "$HOST" --prove-controls || fail "lmok refactor checks and controls"
+ok "refactor: dry-run unified diff / git-apply equivalence, IDE rename/import/rules codemods and safety controls"
+
 echo "PASS: $pass checks"

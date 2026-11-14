@@ -129,6 +129,8 @@ add_executable(lmok
   cpp/host.cpp
   cpp/lint.cpp
   cpp/pattern.cpp
+  cpp/refactor_pattern.cpp
+  cpp/refactor.cpp
   cpp/db.cpp
   cpp/search.cpp
   cpp/baseline.cpp
