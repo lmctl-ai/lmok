@@ -39,7 +39,7 @@ inline RuleTestResult test_rule_file(const std::vector<LintRule> &rules,Grammar 
     // C's preprocessor grammar makes the value one opaque token, including
     // trailing comments. Reparse that token so strings still cannot forge an
     // expectation, while #define ... // lmok-expect remains a real comment.
-    if(grammar==Grammar::C&&kind=="preproc_arg"){
+    if((grammar==Grammar::C||grammar==Grammar::Cpp)&&kind=="preproc_arg"){
       const auto value=parse(grammar,node_text(node));
       for(const auto &part:tree_nodes(value).items)if(node_kind(part).find("comment")!=std::string::npos)
         comment(part,node_start_row(node),node_start_byte(node));

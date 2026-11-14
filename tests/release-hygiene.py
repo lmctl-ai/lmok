@@ -65,9 +65,10 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('lmcode-cpp SDK', notices)
         self.assertIn('SQLite', notices)
         cmake = (ROOT / 'CMakeLists.txt').read_text(encoding='utf-8')
-        for grammar in ('tree-sitter-python', 'tree-sitter-bash', 'tree-sitter-java',
+        for grammar in ('tree-sitter-cpp', 'tree-sitter-python', 'tree-sitter-bash', 'tree-sitter-java',
                         'tree-sitter-go', 'tree-sitter-javascript', 'tree-sitter-typescript'):
             self.assertIn(grammar, cmake, grammar)
+        self.assertIn('## tree-sitter-cpp', notices)
 
 if __name__ == '__main__':
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(ReleaseTests)

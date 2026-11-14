@@ -316,6 +316,7 @@ void register_host(dslvm::Registry &reg, Host &host) {
   parse_method("parse_c", lmok::Grammar::C);
   parse_method("parse_python", lmok::Grammar::Python);
   parse_method("parse_java", lmok::Grammar::Java);
+  parse_method("parse_cpp", lmok::Grammar::Cpp);
   parse_method("parse_bash", lmok::Grammar::Bash);
   // The findings sink: rules are void fns, so they report into the host and
   // the chunk body reads the collection back (count / JSON array string).
@@ -362,6 +363,7 @@ void register_host(dslvm::Registry &reg, Host &host) {
   query_method("query_c", lmok::Grammar::C);
   query_method("query_python", lmok::Grammar::Python);
   query_method("query_java", lmok::Grammar::Java);
+  query_method("query_cpp", lmok::Grammar::Cpp);
   query_method("query_bash", lmok::Grammar::Bash);
   // ts.match_c / ts.match_python: code-shaped patterns (pattern.hpp), compiled once per distinct
   // pattern text per run and cached, so a rule calling match in a loop pays the parse once.
@@ -399,6 +401,7 @@ void register_host(dslvm::Registry &reg, Host &host) {
   reparse_method("reparse_c", lmok::Grammar::C);
   reparse_method("reparse_python", lmok::Grammar::Python);
   reparse_method("reparse_java", lmok::Grammar::Java);
+  reparse_method("reparse_cpp", lmok::Grammar::Cpp);
   reparse_method("reparse_bash", lmok::Grammar::Bash);
   reg.method("Ts", "changed_ranges", {"Tree", "Tree"}, "string", [](void *, Args &args) {
     return Value::string(lmok::changed_ranges_json(*tree_of(args[0].obj, "changed_ranges"),
@@ -504,8 +507,27 @@ std::string canonical_path(const std::string &path) {
   return std::filesystem::u8path(path).generic_u8string();
 }
 
-bool grammar_for_extension(const std::string &ext, lmok::Grammar &grammar) {
-  if (ext == ".c" || ext == ".h") { grammar = lmok::Grammar::C; return true; }
+enum class HeaderLang { C, Cpp };
+
+bool parse_header_lang(const std::string &value, HeaderLang &out) {
+  if (value == "c") { out = HeaderLang::C; return true; }
+  if (value == "cpp") { out = HeaderLang::Cpp; return true; }
+  return false;
+}
+
+bool consume_header_lang(int &i, int argc, char **argv, HeaderLang &out, bool &seen) {
+  if (seen || i + 1 >= argc) return false;
+  if (!parse_header_lang(argv[i + 1], out)) return false;
+  seen = true;
+  ++i;
+  return true;
+}
+
+bool grammar_for_extension(const std::string &ext, lmok::Grammar &grammar, HeaderLang headers = HeaderLang::C) {
+  if (ext == ".c") { grammar = lmok::Grammar::C; return true; }
+  if (ext == ".h") { grammar = headers == HeaderLang::Cpp ? lmok::Grammar::Cpp : lmok::Grammar::C; return true; }
+  if (ext == ".cpp" || ext == ".cc" || ext == ".cxx" ||
+      ext == ".hpp" || ext == ".hh" || ext == ".hxx") { grammar = lmok::Grammar::Cpp; return true; }
   if (ext == ".json") { grammar = lmok::Grammar::Json; return true; }
   if (ext == ".java") { grammar = lmok::Grammar::Java; return true; }
   if (ext == ".py") { grammar = lmok::Grammar::Python; return true; }
@@ -524,7 +546,8 @@ bool grammar_for_extension(const std::string &ext, lmok::Grammar &grammar) {
 // 3 I/O) after printing the diagnostic. With `only` set, directory expansion
 // keeps that grammar's extensions alone (explicit files are kept regardless).
 int expand_targets(const std::vector<std::string> &args, size_t first, std::vector<Target> &targets,
-                   const lmok::Grammar *only = nullptr, const std::vector<std::string> &extra_ignore = {}) {
+                   const lmok::Grammar *only = nullptr, const std::vector<std::string> &extra_ignore = {},
+                   HeaderLang headers = HeaderLang::C) {
   namespace fs = std::filesystem;
   for (size_t i = first; i < args.size(); ++i) {
     std::error_code ec;
@@ -553,7 +576,7 @@ int expand_targets(const std::vector<std::string> &args, size_t first, std::vect
         std::error_code file_ec;
         if (!it->is_regular_file(file_ec)) continue;
         lmok::Grammar grammar;
-        if (!grammar_for_extension(p.extension().u8string(), grammar)) continue;
+        if (!grammar_for_extension(p.extension().u8string(), grammar, headers)) continue;
         if (only && grammar != *only && !(*only==lmok::Grammar::Lmcode && grammar==lmok::Grammar::Lmscript)) continue;
         eligible=true;
         if(ignore->ignored(fs::absolute(p)))continue;
@@ -564,7 +587,7 @@ int expand_targets(const std::vector<std::string> &args, size_t first, std::vect
         return 3;
       }
       if (found.empty() && !eligible) {
-        std::cerr << "no lintable files in " << canonical_path(args[i]) << " (want .c/.h/.json/.py/.sh/.bash/.java/.go/.js)\n";
+        std::cerr << "no lintable files in " << canonical_path(args[i]) << " (want .c/.h/.cpp/.cc/.cxx/.hpp/.hh/.hxx/.json/.py/.sh/.bash/.java/.go/.js/.ts/.tsx/.lms/.lmcode)\n";
         return 2;
       }
       std::sort(found.begin(), found.end());
@@ -579,6 +602,7 @@ int expand_targets(const std::vector<std::string> &args, size_t first, std::vect
 bool parse_lang(const std::string &lang, lmok::Grammar &grammar) {
   if (lang == "json") grammar = lmok::Grammar::Json;
   else if (lang == "c") grammar = lmok::Grammar::C;
+  else if (lang == "cpp") grammar = lmok::Grammar::Cpp;
   else if (lang == "python") grammar = lmok::Grammar::Python;
   else if (lang == "bash") grammar = lmok::Grammar::Bash;
   else if (lang == "java") grammar = lmok::Grammar::Java;
@@ -712,22 +736,22 @@ static int run_cli(int argc, char **argv) {
   const std::string usage =
       "usage: lmok --version | --notices | --lmcode-schema [--json] | --lmcode-signatures\n"
       "       lmok status [--db PATH] [--init]\n"
-      "       lmok index [--db PATH] [--force] [DIR...]\n"
+      "       lmok index [--db PATH] [--force] [--header-lang c|cpp] [DIR...]\n"
       "       lmok symbols [PATTERN] [--lang L] [--kind K] [--db PATH]\n"
       "       lmok refs NAME [--db PATH]\n"
       "       lmok find PATTERN [--fts] [--lang L] [--db PATH] [--limit N]\n"
       "       lmok findings [--rule ID] [--file PATH] [--db PATH]\n"
-      "       lmok parse [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE\n"
-      "       lmok query [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--pattern] PATTERN FILE\n"
-      "       lmok ci [--config FILE] [--no-suppress] [--sarif FILE] [ROOT]\n"
+      "       lmok parse [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE\n"
+      "       lmok query [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--pattern] PATTERN FILE\n"
+      "       lmok ci [--config FILE] [--header-lang c|cpp] [--no-suppress] [--sarif FILE] [ROOT]\n"
       "       lmok rules PACK... | test PACK FIXTURE...\n"
-      "       lmok lint RULES.json FILE|DIR... [--db PATH] [--no-suppress] [--sarif FILE] [--fix|--diff]\n"
+      "       lmok lint RULES.json FILE|DIR... [--db PATH] [--header-lang c|cpp] [--no-suppress] [--sarif FILE] [--fix|--diff]\n"
       "               [--new-since RUN|--baseline FILE] [--fail-on-new] [--changed[=REV]]\n"
-      "       lmok outline FILE|DIR... [--db PATH] [--budget N]\n"
-      "       lmok facts [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
-      "       lmok check [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
-      "       lmok metrics [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] FILE|DIR...\n"
-      "       lmok dup [--lang json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--tokens N] FILE|DIR...\n"
+      "       lmok outline FILE|DIR... [--db PATH] [--budget N] [--header-lang c|cpp]\n"
+      "       lmok facts [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--header-lang c|cpp] FILE|DIR...\n"
+      "       lmok check [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--header-lang c|cpp] RULES.dslb FILE|DIR... [--no-suppress] [--sarif FILE]\n"
+      "       lmok metrics [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--header-lang c|cpp] FILE|DIR...\n"
+      "       lmok dup [--lang json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode] [--header-lang c|cpp] [--tokens N] FILE|DIR...\n"
       "       lmok --lmcode FILE [--lmcode FILE ...] [--db PATH]\n"
       "       lmok serve [--port N] [--preset NAME] [--idle-timeout S] ... (REST server; GET / lists actions)\n"
       "       lmok remote [--server URL] LMOK-ARGS... | --api METHOD PATH [JSON]\n";
@@ -752,8 +776,15 @@ static int run_cli(int argc, char **argv) {
       if(rules.empty())throw dslvm::Error("test needs a non-empty pack");
       lmok::RuleTestResult total;
       for(int i=3;i<argc;++i){
+        const std::string fpath = argv[i];
+        const std::string ext = std::filesystem::u8path(fpath).extension().u8string();
         lmok::Grammar grammar=rules.front().grammar;
-        grammar_for_extension(std::filesystem::u8path(argv[i]).extension().u8string(),grammar);
+        grammar_for_extension(ext,grammar);
+        if (ext == ".h") {
+          bool has_c = false, has_cpp = false;
+          for (const auto &r : rules) { has_c |= (r.grammar == lmok::Grammar::C); has_cpp |= (r.grammar == lmok::Grammar::Cpp); }
+          if (has_cpp && !has_c) grammar = lmok::Grammar::Cpp;
+        }
         std::vector<lmok::LintRule> active;for(const auto &r:rules)if(r.grammar==grammar || (grammar==lmok::Grammar::Lmscript && r.grammar==lmok::Grammar::Lmcode))active.push_back(r);
         if(active.empty())throw dslvm::Error("test fixture has no rules for its language: "+std::string(argv[i]));
         const auto result=lmok::test_rule_file(active,grammar,argv[i],read_file(argv[i]));
@@ -766,12 +797,15 @@ static int run_cli(int argc, char **argv) {
   if (argc >= 2 && std::string(argv[1]) == "ci") {
     std::string root = ".", config_path;
     std::optional<std::string> sarif_path;
-    bool root_seen = false, no_suppress = false;
+    HeaderLang header_lang = HeaderLang::C;
+    bool root_seen = false, no_suppress = false, header_lang_seen = false;
     for (int i = 2; i < argc; ++i) {
       const std::string arg = argv[i];
       if (arg == "--no-suppress") no_suppress = true;
       else if (arg == "--config" && i + 1 < argc && config_path.empty()) config_path = argv[++i];
-      else if (arg == "--sarif" && !sarif_path && i + 1 < argc && std::string(argv[i + 1]).rfind("--", 0) != 0)
+      else if (arg == "--header-lang") {
+        if (!consume_header_lang(i, argc, argv, header_lang, header_lang_seen)) { std::cerr << usage; return 2; }
+      } else if (arg == "--sarif" && !sarif_path && i + 1 < argc && std::string(argv[i + 1]).rfind("--", 0) != 0)
         sarif_path = argv[++i];
       else if (arg.rfind("--", 0) == 0 || root_seen) { std::cerr << usage; return 2; }
       else { root = arg; root_seen = true; }
@@ -782,14 +816,19 @@ static int run_cli(int argc, char **argv) {
     if (config_path.empty()) config_path = (std::filesystem::u8path(root) / ".lmok" / "config.json").generic_u8string();
     try {
       const auto config = lmok::load_project_config(config_path);
+      HeaderLang effective_headers = header_lang;
+      if (!header_lang_seen) parse_header_lang(config.header_lang, effective_headers);
       std::vector<lmok::SarifRuleMeta> sarif_rules;
       std::vector<lmok::SarifResult> sarif_results;
       lmok::SarifSink sarif_sink;
       if (sarif_path) { sarif_sink.rules = &sarif_rules; sarif_sink.results = &sarif_results; }
+      const auto resolve_ext = [effective_headers](const std::string &ext, lmok::Grammar &grammar) {
+        return grammar_for_extension(ext, grammar, effective_headers);
+      };
       const int rc = lmok::run_project_ci<Target>(config, root, no_suppress,
-        [](const std::vector<std::string> &roots, std::vector<Target> &out, const std::vector<std::string> &ignore) {
-          return expand_targets(roots, 0, out, nullptr, ignore);
-        }, grammar_for_extension, read_file, json_escape, parse_lang, sarif_path ? &sarif_sink : nullptr, host.include_metadata);
+        [effective_headers](const std::vector<std::string> &roots, std::vector<Target> &out, const std::vector<std::string> &ignore) {
+          return expand_targets(roots, 0, out, nullptr, ignore, effective_headers);
+        }, resolve_ext, read_file, json_escape, parse_lang, sarif_path ? &sarif_sink : nullptr, host.include_metadata);
       // The SARIF artifact is written once the run completed (even with
       // findings); rc 1 (threshold hit) still counts as a completed run.
       if (sarif_path && (rc == 0 || rc == 1)) {
@@ -830,7 +869,8 @@ static int run_cli(int argc, char **argv) {
   // indexed roots afterwards.
   if (argc >= 2 && std::string(argv[1]) == "index") {
     std::optional<std::string> db_path;
-    bool force = false;
+    bool force = false, header_lang_seen = false;
+    HeaderLang header_lang = HeaderLang::C;
     std::vector<std::string> roots;
     for (int i = 2; i < argc; ++i) {
       const std::string arg = argv[i];
@@ -838,13 +878,15 @@ static int run_cli(int argc, char **argv) {
         db_path = argv[++i];
       } else if (arg == "--force" && !force) {
         force = true;
+      } else if (arg == "--header-lang") {
+        if (!consume_header_lang(i, argc, argv, header_lang, header_lang_seen)) { std::cerr << usage; return 2; }
       } else if (arg.empty() || arg.rfind("--", 0) == 0) {
         std::cerr << usage; return 2;
       } else roots.push_back(arg);
     }
     if (roots.empty()) roots.push_back(".");
     std::vector<Target> targets;
-    if (const int rc = expand_targets(roots, 0, targets)) return rc;
+    if (const int rc = expand_targets(roots, 0, targets, nullptr, {}, header_lang)) return rc;
     namespace fs = std::filesystem;
     try {
       const auto resolved = lmok::resolve_db_path(db_path, true);
@@ -855,12 +897,12 @@ static int run_cli(int argc, char **argv) {
       // the latter has the real hash/stat but NO extraction, so "unchanged"
       // must never skip it (review finding: lint --db then index left files
       // silently un-indexed with "N unchanged").
-      struct FileRow { int64_t id; std::string sha256; int64_t mtime; int64_t size; bool extracted; };
+      struct FileRow { int64_t id; std::string sha256; int64_t mtime; int64_t size; bool extracted; std::string lang; };
       std::map<std::string, FileRow> known;
       {
         auto q = db.prepare(lmok::index_files_sql);
         while (q.step())
-          known.emplace(q.text(1), FileRow{q.integer(0), q.text(2), q.integer(3), q.integer(4), q.integer(5) != 0});
+          known.emplace(q.text(1), FileRow{q.integer(0), q.text(2), q.integer(3), q.integer(4), q.integer(5) != 0, q.text(6)});
       }
       const int64_t now = static_cast<int64_t>(std::time(nullptr));
       int64_t n_indexed = 0, n_unchanged = 0;
@@ -869,10 +911,11 @@ static int run_cli(int argc, char **argv) {
         const std::string &path = target.path;
         seen.insert(path);
         lmok::Grammar grammar;
-        if (!grammar_for_extension(fs::u8path(path).extension().u8string(), grammar)) {
+        if (!grammar_for_extension(fs::u8path(path).extension().u8string(), grammar, header_lang)) {
           std::cerr << "cannot infer the language of " << path << " from its extension\n";
           return 3;
         }
+        const std::string lang = lmok::grammar_name(grammar);
         std::error_code ec;
         const auto fsize = fs::file_size(fs::u8path(path), ec);
         if (ec) { std::cerr << "cannot stat " << path << ": " << ec.message() << "\n"; return 3; }
@@ -881,7 +924,7 @@ static int run_cli(int argc, char **argv) {
         const int64_t mtime = file_mtime_ns(path, ec);
         if (ec) { std::cerr << "cannot stat " << path << ": " << ec.message() << "\n"; return 3; }
         const auto it = known.find(path);
-        const bool reusable = !force && it != known.end() && it->second.extracted;
+        const bool reusable = !force && it != known.end() && it->second.extracted && it->second.lang == lang;
         if (reusable && it->second.mtime == mtime &&
             it->second.size == static_cast<int64_t>(fsize)) { ++n_unchanged; continue; }
         std::string raw;
@@ -902,7 +945,6 @@ static int run_cli(int argc, char **argv) {
         } catch (const std::exception &e) {
           std::cerr << "index " << path << ": " << e.what() << "\n"; return 3;
         }
-        const std::string lang = lmok::grammar_name(grammar);
         int64_t file_id = -1;
         {
           lmok::Transaction transaction(db);
@@ -1162,19 +1204,8 @@ static int run_cli(int argc, char **argv) {
     }
     if (argi + 1 < argc && std::string(argv[argi]) == "--lang") {
       const std::string lang = argv[argi + 1];
-      if (lang == "json") grammar = lmok::Grammar::Json;
-      else if (lang == "c") grammar = lmok::Grammar::C;
-      else if (lang == "python") grammar = lmok::Grammar::Python;
-      else if (lang == "bash") grammar = lmok::Grammar::Bash;
-      else if (lang == "java") grammar = lmok::Grammar::Java;
-      else if (lang == "go") grammar = lmok::Grammar::Go;
-      else if (lang == "javascript") grammar = lmok::Grammar::Javascript;
-      else if (lang == "typescript") grammar = lmok::Grammar::Typescript;
-      else if (lang == "tsx") grammar = lmok::Grammar::Tsx;
-      else if (lang == "lmscript") grammar = lmok::Grammar::Lmscript;
-      else if (lang == "lmcode") grammar = lmok::Grammar::Lmcode;
-      else {
-        std::cerr << "unknown language '" << lang << "' (known: json, c, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)\n" << usage;
+      if (!parse_lang(lang, grammar)) {
+        std::cerr << "unknown language '" << lang << "' (known: json, c, cpp, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)\n" << usage;
         return 2;
       }
       argi += 2;
@@ -1289,7 +1320,8 @@ static int run_cli(int argc, char **argv) {
     }
     // Flags may appear anywhere after the pack; the rest are targets.
     std::optional<std::string> db_path, sarif_path, baseline_path, new_since;
-    bool no_suppress = false, fix_files = false, show_diff = false, changed = false, fail_on_new = false;
+    bool no_suppress = false, fix_files = false, show_diff = false, changed = false, fail_on_new = false, header_lang_seen = false;
+    HeaderLang header_lang = HeaderLang::C;
     std::string changed_rev = "HEAD"; // bare --changed: working tree vs HEAD
     std::vector<std::string> target_args;
     for (int i = 3; i < argc; ++i) {
@@ -1305,6 +1337,11 @@ static int run_cli(int argc, char **argv) {
           return 2;
         }
         *slot = argv[++i];
+      } else if (arg == "--header-lang") {
+        if (!consume_header_lang(i, argc, argv, header_lang, header_lang_seen)) {
+          std::cerr << usage;
+          return 2;
+        }
       } else if (arg == "--fix") {
         fix_files = true;
       } else if (arg == "--diff") {
@@ -1380,23 +1417,11 @@ static int run_cli(int argc, char **argv) {
       catch (const lmok::BaselineError &e) { std::cerr << e.what() << "\n"; return 2; }
     }
     // Per-grammar rule lists for extension-based filtering.
-    std::vector<lmok::LintRule> c_rules, json_rules, python_rules, bash_rules, java_rules, go_rules, javascript_rules, typescript_rules, tsx_rules, lmscript_rules, lmcode_rules;
-    for (const auto &rule : rules) {
-      if (rule.grammar == lmok::Grammar::C) c_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Python) python_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Bash) bash_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Java) java_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Go) go_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Javascript) javascript_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Typescript) typescript_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Tsx) tsx_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Lmscript) lmscript_rules.push_back(rule);
-      else if (rule.grammar == lmok::Grammar::Lmcode) lmcode_rules.push_back(rule);
-      else json_rules.push_back(rule);
-    }
+    std::map<lmok::Grammar, std::vector<lmok::LintRule>> rules_by_grammar;
+    for (const auto &rule : rules) rules_by_grammar[rule.grammar].push_back(rule);
     namespace fs = std::filesystem;
     std::vector<Target> targets;
-    if (const int rc = expand_targets(target_args, 0, targets)) return rc;
+    if (const int rc = expand_targets(target_args, 0, targets, nullptr, {}, header_lang)) return rc;
     // With --db the run is recorded only after EVERY target linted cleanly: a
     // failed/interrupted scan must never look like a successful empty result,
     // so findings are collected per file and written in one transaction at
@@ -1413,19 +1438,31 @@ static int run_cli(int argc, char **argv) {
         if (!changed_files.count(absolute)) continue;
       }
       const std::vector<lmok::LintRule> *active = &rules;
-      const std::string ext = fs::u8path(target.path).extension().u8string();
-      if (ext == ".c" || ext == ".h") active = &c_rules;
-      else if (ext == ".json") active = &json_rules;
-      else if (ext == ".java") active = &java_rules;
-      else if (ext == ".py") active = &python_rules;
-      else if (ext == ".sh" || ext == ".bash") active = &bash_rules;
-      else if (ext == ".go") active = &go_rules;
-      else if (ext == ".js") active = &javascript_rules;
-      else if (ext == ".ts") active = &typescript_rules;
-      else if (ext == ".tsx") active = &tsx_rules;
       std::vector<lmok::LintRule> script_rules;
-      if(ext==".lms"){script_rules=lmscript_rules;script_rules.insert(script_rules.end(),lmcode_rules.begin(),lmcode_rules.end());active=&script_rules;}
-      if (ext == ".lmcode") active = &lmcode_rules;
+      const std::string ext = fs::u8path(target.path).extension().u8string();
+      lmok::Grammar file_grammar = lmok::Grammar::Json;
+      bool known_ext = grammar_for_extension(ext, file_grammar, header_lang);
+      if (!target.from_dir && ext == ".h" && !header_lang_seen &&
+          rules_by_grammar.count(lmok::Grammar::Cpp) && !rules_by_grammar.count(lmok::Grammar::C))
+        file_grammar = lmok::Grammar::Cpp;
+      std::string record_lang = "unknown";
+      if (known_ext) {
+        record_lang = lmok::grammar_name(file_grammar);
+        if (file_grammar == lmok::Grammar::Lmscript) {
+          const auto it_lms = rules_by_grammar.find(lmok::Grammar::Lmscript);
+          const auto it_lmc = rules_by_grammar.find(lmok::Grammar::Lmcode);
+          if (it_lms != rules_by_grammar.end()) script_rules = it_lms->second;
+          if (it_lmc != rules_by_grammar.end())
+            script_rules.insert(script_rules.end(), it_lmc->second.begin(), it_lmc->second.end());
+          active = &script_rules;
+        } else {
+          static const std::vector<lmok::LintRule> kEmptyRules;
+          const auto it = rules_by_grammar.find(file_grammar);
+          active = it == rules_by_grammar.end() ? &kEmptyRules : &it->second;
+        }
+      } else if (rules_by_grammar.size() == 1) {
+        record_lang = lmok::grammar_name(rules_by_grammar.begin()->first);
+      }
       // A file whose language has no rules in the pack: skipped silently when
       // it came from a directory; an explicitly named file still reports.
       if (active->empty() && target.from_dir) continue;
@@ -1507,8 +1544,7 @@ static int run_cli(int argc, char **argv) {
       if (db_path) {
         lmok::LintFileRecord record;
         record.path = target.path;
-        lmok::Grammar file_grammar;
-        record.lang = grammar_for_extension(ext, file_grammar) ? lmok::grammar_name(file_grammar) : "unknown";
+        record.lang = record_lang;
         record.sha256 = dslvm::hex(dslvm::sha256(raw));
         record.size = static_cast<int64_t>(raw.size());
         std::error_code mtime_ec;
@@ -1546,8 +1582,9 @@ static int run_cli(int argc, char **argv) {
   }
   if (argc >= 2 && (std::string(argv[1]) == "metrics" || std::string(argv[1]) == "dup")) {
     const bool duplication = std::string(argv[1]) == "dup";
-    bool forced = false, tokens_seen = false;
+    bool forced = false, tokens_seen = false, header_lang_seen = false;
     lmok::Grammar forced_grammar = lmok::Grammar::Json;
+    HeaderLang header_lang = HeaderLang::C;
     int64_t min_tokens = 20;
     std::vector<std::string> inputs;
     for (int i = 2; i < argc; ++i) {
@@ -1555,6 +1592,8 @@ static int run_cli(int argc, char **argv) {
       if (arg == "--lang" && !forced && i + 1 < argc) {
         if (!parse_lang(argv[++i], forced_grammar)) { std::cerr << usage; return 2; }
         forced = true;
+      } else if (arg == "--header-lang") {
+        if (!consume_header_lang(i, argc, argv, header_lang, header_lang_seen)) { std::cerr << usage; return 2; }
       } else if (arg == "--tokens" && duplication && !tokens_seen && i + 1 < argc) {
         const std::string value = argv[++i];
         size_t used = 0;
@@ -1567,10 +1606,10 @@ static int run_cli(int argc, char **argv) {
     }
     if (inputs.empty()) { std::cerr << usage; return 2; }
     std::vector<Target> targets;
-    if (const int rc = expand_targets(inputs, 0, targets, forced ? &forced_grammar : nullptr)) return rc;
+    if (const int rc = expand_targets(inputs, 0, targets, forced ? &forced_grammar : nullptr, {}, header_lang)) return rc;
     for (const auto &target : targets) {
       lmok::Grammar grammar = forced_grammar;
-      if ((!forced || target.from_dir) && !grammar_for_extension(std::filesystem::u8path(target.path).extension().u8string(), grammar)) {
+      if ((!forced || target.from_dir) && !grammar_for_extension(std::filesystem::u8path(target.path).extension().u8string(), grammar, header_lang)) {
         std::cerr << "cannot infer the language of " << target.path << " from its extension (use --lang)\n"; return 2;
       }
       try {
@@ -1591,11 +1630,16 @@ static int run_cli(int argc, char **argv) {
     std::optional<std::string> dbpath;
     size_t budget = std::numeric_limits<size_t>::max();
     std::vector<std::string> paths;
-    bool positional = false;
+    bool positional = false, header_lang_seen = false;
+    HeaderLang header_lang = HeaderLang::C;
     for (int i = 2; i < argc; ++i) {
       const std::string arg = argv[i];
       if (!positional && arg == "--") { positional = true; continue; }
-      if (!positional && (arg == "--db" || arg == "--budget")) {
+      if (!positional && arg == "--header-lang") {
+        if (!consume_header_lang(i, argc, argv, header_lang, header_lang_seen)) {
+          std::cerr << "--header-lang needs c or cpp\n"; return 2;
+        }
+      } else if (!positional && (arg == "--db" || arg == "--budget")) {
         if (++i == argc) { std::cerr << arg << " needs a value\n"; return 2; }
         if (arg == "--db") dbpath = argv[i];
         else {
@@ -1611,7 +1655,7 @@ static int run_cli(int argc, char **argv) {
     }
     if (paths.empty()) { std::cerr << usage; return 2; }
     std::vector<Target> targets;
-    if (const int rc = expand_targets(paths, 0, targets)) return rc;
+    if (const int rc = expand_targets(paths, 0, targets, nullptr, {}, header_lang)) return rc;
     struct Block { std::string path; int64_t refs = 0; std::vector<std::string> lines; };
     std::vector<Block> blocks;
     std::string current;
@@ -1630,7 +1674,7 @@ static int run_cli(int argc, char **argv) {
         const auto path = std::filesystem::u8path(current).lexically_normal().generic_u8string();
         if (!seen.insert(path).second) continue;
         lmok::Grammar grammar;
-        if (!grammar_for_extension(std::filesystem::u8path(path).extension().u8string(), grammar)) {
+        if (!grammar_for_extension(std::filesystem::u8path(path).extension().u8string(), grammar, header_lang)) {
           std::cerr << "cannot infer the language of " << current << " from its extension\n"; return 2;
         }
         const auto raw = read_file(current);
@@ -1689,26 +1733,33 @@ static int run_cli(int argc, char **argv) {
   // usage error.
   if (argc >= 2 && std::string(argv[1]) == "facts") {
     int argi = 2;
-    bool forced = false;
+    bool forced = false, header_lang_seen = false;
     lmok::Grammar forced_grammar = lmok::Grammar::Json;
-    if (argi < argc && std::string(argv[argi]) == "--lang") {
-      if (argi + 1 >= argc) { std::cerr << "--lang needs a value (json|c|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode)\n" << usage; return 2; }
-      if (!parse_lang(argv[argi + 1], forced_grammar)) {
-        std::cerr << "unknown language '" << argv[argi + 1] << "' (known: json, c, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)\n" << usage;
-        return 2;
+    HeaderLang header_lang = HeaderLang::C;
+    while (argi < argc && (std::string(argv[argi]) == "--lang" || std::string(argv[argi]) == "--header-lang")) {
+      if (std::string(argv[argi]) == "--lang") {
+        if (forced) { std::cerr << usage; return 2; }
+        if (argi + 1 >= argc) { std::cerr << "--lang needs a value (json|c|cpp|python|bash|java|go|javascript|typescript|tsx|lmscript|lmcode)\n" << usage; return 2; }
+        if (!parse_lang(argv[argi + 1], forced_grammar)) {
+          std::cerr << "unknown language '" << argv[argi + 1] << "' (known: json, c, cpp, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)\n" << usage;
+          return 2;
+        }
+        forced = true;
+        argi += 2;
+      } else {
+        if (!consume_header_lang(argi, argc, argv, header_lang, header_lang_seen)) { std::cerr << usage; return 2; }
+        ++argi;
       }
-      forced = true;
-      argi += 2;
     }
     if (argi >= argc) { std::cerr << usage; return 2; }
     std::vector<Target> targets;
     if (const int rc = expand_targets(std::vector<std::string>(argv + argi, argv + argc), 0, targets,
-                                      forced ? &forced_grammar : nullptr)) return rc;
+                                      forced ? &forced_grammar : nullptr, {}, header_lang)) return rc;
     for (const auto &target : targets) {
       lmok::Grammar grammar = forced_grammar;
       if (!forced || (target.from_dir && forced_grammar!=lmok::Grammar::Lmcode)) {
         const std::string ext = std::filesystem::u8path(target.path).extension().u8string();
-        if (!grammar_for_extension(ext, grammar)) {
+        if (!grammar_for_extension(ext, grammar, header_lang)) {
           std::cerr << "cannot infer the language of " << target.path << " from its extension (use --lang)\n";
           return 2;
         }
@@ -1740,10 +1791,20 @@ static int run_cli(int argc, char **argv) {
     argc=static_cast<int>(check_argv.size());argv=check_argv.data();
     int argi = 2;
     lmok::Grammar grammar = lmok::Grammar::Json;
-    if (argi + 1 < argc && std::string(argv[argi]) == "--lang") {
-      const std::string lang = argv[argi + 1];
-      if (!parse_lang(lang, grammar)) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE","unknown check language: "+lang));
-      argi += 2;
+    HeaderLang header_lang = HeaderLang::C;
+    bool lang_seen = false, header_lang_seen = false;
+    while (argi < argc && (std::string(argv[argi]) == "--lang" || std::string(argv[argi]) == "--header-lang")) {
+      if (std::string(argv[argi]) == "--lang") {
+        if (lang_seen || argi + 1 >= argc) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));
+        const std::string lang = argv[argi + 1];
+        if (!parse_lang(lang, grammar)) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE","unknown check language: "+lang));
+        lang_seen = true;
+        argi += 2;
+      } else {
+        if (!consume_header_lang(argi, argc, argv, header_lang, header_lang_seen))
+          return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));
+        ++argi;
+      }
     }
     if (argi + 1 >= argc) return dslvm::failure_frame("cli",dslvm::Error("CLI_USAGE",usage));
     // --sarif FILE may appear once among the positionals; the rest are the
@@ -1767,7 +1828,7 @@ static int run_cli(int argc, char **argv) {
     try { program = dslvm::Program::load(read_bytecode(check_inputs[0]), schema, reg); }
     catch (const dslvm::Error &error) { return fail_check("load", error); }
     std::vector<Target> check_targets;
-    if(const int rc=expand_targets(std::vector<std::string>(check_inputs.begin()+1,check_inputs.end()),0,check_targets,&grammar)){(void)rc;results.fail(std::nullopt,"run",dslvm::Error("RUN_HOST","cannot expand check inputs"));return results.write_frame(std::cout);}
+    if(const int rc=expand_targets(std::vector<std::string>(check_inputs.begin()+1,check_inputs.end()),0,check_targets,&grammar,{},header_lang)){(void)rc;results.fail(std::nullopt,"run",dslvm::Error("RUN_HOST","cannot expand check inputs"));return results.write_frame(std::cout);}
     std::map<std::string, std::vector<size_t>> by_kind;
     for (size_t i = 0; i < program.entries().size(); ++i) {
       const auto &entry = program.entries()[i];

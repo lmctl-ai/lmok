@@ -20,16 +20,16 @@ std::string escape(const std::string &text) {
   return out;
 }
 bool control(const std::string &kind) {
-  return kind == "if_statement" || kind == "for_statement" || kind == "while_statement" ||
-         kind == "for_in_statement" || kind == "catch_clause" || kind == "switch_statement" ||
-         kind == "do_statement" || kind == "try_statement";
+  return kind == "if_statement" || kind == "for_statement" || kind == "for_range_loop" ||
+         kind == "while_statement" || kind == "for_in_statement" || kind == "catch_clause" ||
+         kind == "switch_statement" || kind == "do_statement" || kind == "try_statement";
 }
 bool literal(const std::string &kind) {
   return (kind.size() >= 8 && kind.compare(kind.size() - 8, 8, "_literal") == 0) ||
          kind == "ansi_c_string" || kind == "string" || kind == "string_literal" || kind == "raw_string" ||
          kind == "char_literal" || kind == "character_literal" || kind == "number_literal" ||
          kind == "number" || kind == "integer" || kind == "float" || kind == "true" ||
-         kind == "false" || kind == "none" || kind == "null" || kind == "concatenated_string";
+         kind == "false" || kind == "none" || kind == "null" || kind == "nullptr" || kind == "concatenated_string";
 }
 struct Token { uint64_t normalized; Node node; };
 

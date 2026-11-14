@@ -15,6 +15,7 @@
 
 extern "C" const TSLanguage *tree_sitter_json(void);
 extern "C" const TSLanguage *tree_sitter_c(void);
+extern "C" const TSLanguage *tree_sitter_cpp(void);
 extern "C" const TSLanguage *tree_sitter_python(void);
 extern "C" const TSLanguage *tree_sitter_bash(void);
 extern "C" const TSLanguage *tree_sitter_java(void);
@@ -33,6 +34,7 @@ static const TSLanguage *language_of(Grammar grammar) {
   switch (grammar) {
   case Grammar::Json: return tree_sitter_json();
   case Grammar::C: return tree_sitter_c();
+  case Grammar::Cpp: return tree_sitter_cpp();
   case Grammar::Python: return tree_sitter_python();
   case Grammar::Bash: return tree_sitter_bash();
   case Grammar::Java: return tree_sitter_java();
@@ -91,6 +93,7 @@ const char *grammar_name(Grammar grammar) {
   switch (grammar) {
   case Grammar::Json: return "json";
   case Grammar::C: return "c";
+  case Grammar::Cpp: return "cpp";
   case Grammar::Python: return "python";
   case Grammar::Bash: return "bash";
   case Grammar::Java: return "java";
@@ -127,12 +130,18 @@ std::string annotation_problem(Grammar grammar, const std::string &kind) {
 Tree parse(Grammar grammar, const std::string &text) {
   check_text_size("parse", text);
   TSParser *parser = ts_parser_new();
-  ts_parser_set_language(parser, language_of(grammar));
+  if (!parser) throw std::runtime_error("parse: failed to allocate tree-sitter parser");
+  if (!ts_parser_set_language(parser, language_of(grammar))) {
+    ts_parser_delete(parser);
+    throw std::runtime_error(std::string("parse: incompatible grammar ABI for ") + grammar_name(grammar));
+  }
   Tree result;
   result.tree_ = ts_parser_parse_string(parser, nullptr, text.data(),
                                         static_cast<uint32_t>(text.size()));
-  result.source_ = text;
   ts_parser_delete(parser);
+  if (!result.tree_)
+    throw std::runtime_error(std::string("parse: parser returned null tree for ") + grammar_name(grammar));
+  result.source_ = text;
   return result;
 }
 
@@ -140,12 +149,18 @@ Tree parse_range(Grammar grammar, const Node &body) {
   const TSNode &node=ts(body);
   const TSRange range{ts_node_start_point(node),ts_node_end_point(node),ts_node_start_byte(node),ts_node_end_byte(node)};
   TSParser *parser=ts_parser_new();
-  ts_parser_set_language(parser,language_of(grammar));
+  if (!parser) throw std::runtime_error("parse_range: failed to allocate tree-sitter parser");
+  if (!ts_parser_set_language(parser,language_of(grammar))) {
+    ts_parser_delete(parser);
+    throw std::runtime_error(std::string("parse_range: incompatible grammar ABI for ") + grammar_name(grammar));
+  }
   if(!ts_parser_set_included_ranges(parser,&range,1)){ts_parser_delete(parser);throw std::runtime_error("invalid injection range");}
   Tree result;
   result.source_=body.owner->source();
   result.tree_=ts_parser_parse_string(parser,nullptr,result.source_.data(),static_cast<uint32_t>(result.source_.size()));
   ts_parser_delete(parser);
+  if (!result.tree_)
+    throw std::runtime_error(std::string("parse_range: parser returned null tree for ") + grammar_name(grammar));
   return result;
 }
 
@@ -216,12 +231,18 @@ Tree reparse(Grammar grammar, Tree &old_tree, const std::string &new_text) {
     old_tree.has_pending_edit_ = false;
   }
   TSParser *parser = ts_parser_new();
-  ts_parser_set_language(parser, language_of(grammar));
+  if (!parser) throw std::runtime_error("reparse: failed to allocate tree-sitter parser");
+  if (!ts_parser_set_language(parser, language_of(grammar))) {
+    ts_parser_delete(parser);
+    throw std::runtime_error(std::string("reparse: incompatible grammar ABI for ") + grammar_name(grammar));
+  }
   Tree result;
   result.tree_ = ts_parser_parse_string(parser, static_cast<TSTree *>(old_tree.tree_),
                                         new_text.data(), static_cast<uint32_t>(new_text.size()));
-  result.source_ = new_text;
   ts_parser_delete(parser);
+  if (!result.tree_)
+    throw std::runtime_error(std::string("reparse: parser returned null tree for ") + grammar_name(grammar));
+  result.source_ = new_text;
   return result;
 }
 

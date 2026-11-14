@@ -712,13 +712,13 @@ std::vector<Preset> builtin_presets() {
 }
 
 const std::vector<std::string> &languages() {
-  static const std::vector<std::string> langs = {"json", "c", "python", "bash", "java", "go", "javascript", "typescript", "tsx", "lmscript", "lmcode"};
+  static const std::vector<std::string> langs = {"json", "c", "cpp", "python", "bash", "java", "go", "javascript", "typescript", "tsx", "lmscript", "lmcode"};
   return langs;
 }
 
 std::string extension_for(const std::string &lang) {
   static const std::map<std::string, std::string> ext = {
-      {"json", ".json"}, {"c", ".c"}, {"python", ".py"}, {"bash", ".sh"}, {"java", ".java"}, {"go", ".go"},
+      {"json", ".json"}, {"c", ".c"}, {"cpp", ".cpp"}, {"python", ".py"}, {"bash", ".sh"}, {"java", ".java"}, {"go", ".go"},
       {"javascript", ".js"}, {"typescript", ".ts"}, {"tsx", ".tsx"}, {"lmscript", ".lms"}, {"lmcode", ".lmcode"}};
   auto it = ext.find(lang);
   return it == ext.end() ? "" : it->second;

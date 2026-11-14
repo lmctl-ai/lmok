@@ -36,6 +36,7 @@ std::string pack_error(const std::string &path, const std::string &what) {
 bool grammar_of(const std::string &name, Grammar &grammar) {
   if (name == "json") { grammar = Grammar::Json; return true; }
   if (name == "c") { grammar = Grammar::C; return true; }
+  if (name == "cpp") { grammar = Grammar::Cpp; return true; }
   if (name == "python") { grammar = Grammar::Python; return true; }
   if (name == "java") { grammar = Grammar::Java; return true; }
   if (name == "bash") { grammar = Grammar::Bash; return true; }
@@ -107,7 +108,7 @@ std::vector<LintRule> load_rule_pack(const std::string &path) {
   if (const JsonNode *lang = member(root, "lang")) {
     if (lang->kind != JsonNode::Kind::String || !grammar_of(lang->text, pack_grammar))
       throw dslvm::Error(pack_error(path, "unknown lang '" +
-        (lang->kind == JsonNode::Kind::String ? lang->text : "?") + "' (known: json, c, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)"));
+        (lang->kind == JsonNode::Kind::String ? lang->text : "?") + "' (known: json, c, cpp, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)"));
     pack_has_lang = true;
   }
   const JsonNode *rules_node = member(root, "rules");
@@ -195,7 +196,7 @@ std::vector<LintRule> load_rule_pack(const std::string &path) {
     if (const JsonNode *lang = member(entry, "lang")) {
       if (lang->kind != JsonNode::Kind::String || !grammar_of(lang->text, rule.grammar))
         fail("unknown lang '" + (lang->kind == JsonNode::Kind::String ? lang->text : "?") +
-             "' (known: json, c, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)");
+             "' (known: json, c, cpp, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)");
     } else {
       if (!pack_has_lang) fail("no language (set 'lang' at pack or rule level)");
       rule.grammar = pack_grammar;
@@ -239,7 +240,7 @@ std::vector<LintRule> load_rule_pack(const std::string &path) {
 
 std::vector<LintFinding> lint_text(const std::vector<LintRule> &rules, const std::string &text, Suppression *suppression, bool no_suppress, const std::map<Grammar, Tree> *parsed, bool lmscript_container) {
   std::vector<LintFinding> findings;
-  for (const Grammar grammar : {Grammar::Json, Grammar::C, Grammar::Python, Grammar::Bash, Grammar::Java, Grammar::Go, Grammar::Javascript, Grammar::Typescript, Grammar::Tsx, Grammar::Lmscript, Grammar::Lmcode}) {
+  for (const Grammar grammar : {Grammar::Json, Grammar::C, Grammar::Cpp, Grammar::Python, Grammar::Bash, Grammar::Java, Grammar::Go, Grammar::Javascript, Grammar::Typescript, Grammar::Tsx, Grammar::Lmscript, Grammar::Lmcode}) {
     std::vector<const LintRule *> here;
     for (const auto &rule : rules)
       if (rule.grammar == grammar) here.push_back(&rule);

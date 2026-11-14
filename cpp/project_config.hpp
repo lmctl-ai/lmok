@@ -22,6 +22,7 @@ struct ProjectConfig {
   std::vector<std::string> ignore;
   std::string severity_floor = "major";
   std::string fail_on = "findings";
+  std::string header_lang = "c";
   std::optional<std::string> baseline;
 };
 
@@ -80,7 +81,8 @@ inline ProjectConfig load_project_config(const std::string &path) {
 
   for (const auto &entry : root.object) {
     if (entry.key != "version" && entry.key != "packs" && entry.key != "ignore" &&
-        entry.key != "severity_floor" && entry.key != "fail_on" && entry.key != "baseline")
+        entry.key != "severity_floor" && entry.key != "fail_on" &&
+        entry.key != "header_lang" && entry.key != "baseline")
       fail(path, "unknown key '" + entry.key + "'");
   }
 
@@ -116,6 +118,13 @@ inline ProjectConfig load_project_config(const std::string &path) {
         (fail_on->text != "findings" && fail_on->text != "none"))
       fail(path, "'fail_on' must be one of findings, none");
     config.fail_on = fail_on->text;
+  }
+
+  if (const JsonNode *header_lang = member(root, "header_lang")) {
+    if (header_lang->kind != JsonNode::Kind::String ||
+        (header_lang->text != "c" && header_lang->text != "cpp"))
+      fail(path, "'header_lang' must be one of c, cpp");
+    config.header_lang = header_lang->text;
   }
 
   if (const JsonNode *baseline = member(root, "baseline")) {

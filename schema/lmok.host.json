@@ -215,6 +215,32 @@
             "returns": "Tree"
           }
         ],
+        "parse_cpp": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "Tree"
+          }
+        ],
+        "query_cpp": [
+          {
+            "params": [
+              "Node",
+              "string"
+            ],
+            "returns": "NodeList"
+          }
+        ],
+        "reparse_cpp": [
+          {
+            "params": [
+              "Tree",
+              "string"
+            ],
+            "returns": "Tree"
+          }
+        ],
         "db_files": [
           {
             "params": [

@@ -68,6 +68,7 @@ if [[ "${1:-}" == "--verify" ]]; then
     'tree_sitter tree-sitter-0.27.1.tar.gz tree-sitter' \
     'tree_sitter_json tree-sitter-json-254c42a.tar.gz tree-sitter-json' \
     'tree_sitter_c tree-sitter-c-b780e47.tar.gz tree-sitter-c' \
+    'tree_sitter_cpp tree-sitter-cpp-0.23.4.tar.gz tree-sitter-cpp' \
     'tree_sitter_python tree-sitter-python-0.23.6.tar.gz tree-sitter-python' \
     'tree_sitter_bash tree-sitter-bash-0.25.1.tar.gz tree-sitter-bash' \
     'tree_sitter_java tree-sitter-java-0.23.5.tar.gz tree-sitter-java' \
@@ -83,12 +84,15 @@ if [[ "${1:-}" == "--verify" ]]; then
     [[ "$(cat "$DEST/$dir/.lmok-archive-sha256")" == "$(get "$name" sha256)" ]] || { echo "$name pin mismatch" >&2; exit 1; }
     [[ "$(tree_digest "$DEST/$dir")" == "$(cat "$DEST/$dir/.lmok-tree-sha256")" ]] || { echo "$name extracted sources differ from the archive (edited third_party/$dir?); run scripts/sync-deps.sh after removing it" >&2; exit 1; }
   done
+  [[ -f "$DEST/tree-sitter-cpp/src/parser.c" && -f "$DEST/tree-sitter-cpp/src/scanner.c" ]] || { echo "tree_sitter_cpp missing parser.c or scanner.c" >&2; exit 1; }
   echo "lmok third-party archives match deps.lock"
   exit 0
 fi
 fetch_one tree_sitter "$(get tree_sitter url)" "$(get tree_sitter sha256)" tree-sitter-0.27.1.tar.gz tree-sitter
 fetch_one tree_sitter_json "$(get tree_sitter_json url)" "$(get tree_sitter_json sha256)" tree-sitter-json-254c42a.tar.gz tree-sitter-json
 fetch_one tree_sitter_c "$(get tree_sitter_c url)" "$(get tree_sitter_c sha256)" tree-sitter-c-b780e47.tar.gz tree-sitter-c
+fetch_one tree_sitter_cpp "$(get tree_sitter_cpp url)" "$(get tree_sitter_cpp sha256)" tree-sitter-cpp-0.23.4.tar.gz tree-sitter-cpp
+[[ -f "$DEST/tree-sitter-cpp/src/parser.c" && -f "$DEST/tree-sitter-cpp/src/scanner.c" ]] || { echo "tree_sitter_cpp missing parser.c or scanner.c" >&2; exit 1; }
 fetch_one tree_sitter_python "$(get tree_sitter_python url)" "$(get tree_sitter_python sha256)" tree-sitter-python-0.23.6.tar.gz tree-sitter-python
 fetch_one tree_sitter_bash "$(get tree_sitter_bash url)" "$(get tree_sitter_bash sha256)" tree-sitter-bash-0.25.1.tar.gz tree-sitter-bash
 fetch_one tree_sitter_java "$(get tree_sitter_java url)" "$(get tree_sitter_java sha256)" tree-sitter-java-0.23.5.tar.gz tree-sitter-java

@@ -1,6 +1,7 @@
 // E6 facts extraction; see facts.hpp for the contract.
 #include "facts.hpp"
 #include "facts_c_embedded.hpp"
+#include "facts_cpp_embedded.hpp"
 #include "facts_python_embedded.hpp"
 #include "facts_bash_embedded.hpp"
 #include "facts_json_embedded.hpp"
@@ -20,6 +21,7 @@ namespace lmok {
 
 const std::string &facts_query(Grammar grammar) {
   static const std::string c(reinterpret_cast<const char *>(embedded_facts_c), embedded_facts_c_size);
+  static const std::string cpp(reinterpret_cast<const char *>(embedded_facts_cpp), embedded_facts_cpp_size);
   static const std::string python(reinterpret_cast<const char *>(embedded_facts_python), embedded_facts_python_size);
   static const std::string bash(reinterpret_cast<const char *>(embedded_facts_bash), embedded_facts_bash_size);
   static const std::string json(reinterpret_cast<const char *>(embedded_facts_json), embedded_facts_json_size);
@@ -32,6 +34,7 @@ const std::string &facts_query(Grammar grammar) {
   static const std::string lmcode(reinterpret_cast<const char *>(embedded_facts_lmcode), embedded_facts_lmcode_size);
   switch (grammar) {
   case Grammar::C: return c;
+  case Grammar::Cpp: return cpp;
   case Grammar::Python: return python;
   case Grammar::Bash: return bash;
   case Grammar::Json: return json;
@@ -54,8 +57,61 @@ bool starts_with(const std::string &s, const char *prefix) { return s.rfind(pref
 // Definitions that open a scope for the facts nested inside them.
 bool is_scope_kind(const std::string &kind) {
   return kind == "def.function" || kind == "def.method" || kind == "def.prototype" ||
-         kind == "def.class" || kind == "def.interface" || kind == "def.struct" || kind == "def.union" || kind == "def.enum" ||
+         kind == "def.namespace" || kind == "def.class" || kind == "def.interface" ||
+         kind == "def.struct" || kind == "def.union" || kind == "def.enum" ||
          kind == "def.key";
+}
+
+std::string normalize_cpp_scope_part(std::string part) {
+  size_t pos = 0;
+  while ((pos = part.find("::", pos)) != std::string::npos) {
+    part.replace(pos, 2, ".");
+    pos += 1;
+  }
+  return part;
+}
+
+bool has_ancestor_kind_before(const Node &leaf, const void *stop_id, const char *kind) {
+  Node cur = leaf;
+  while (node_id(cur) != stop_id && node_has_parent(cur)) {
+    cur = node_parent(cur);
+    if (node_id(cur) == stop_id) break;
+    if (node_kind(cur) == kind) return true;
+  }
+  return false;
+}
+
+bool cpp_method_syntactically_certain(const Node &fn_def, const std::string &leaf_kind,
+                                      const std::string &leaf_name,
+                                      const std::vector<std::string> &qualifiers) {
+  if (leaf_kind == "destructor_name" || leaf_kind == "operator_cast" || leaf_kind == "operator_name")
+    return true;
+  if (!qualifiers.empty() && leaf_name == qualifiers.back()) return true;
+  const int64_t def_children = node_child_count(fn_def);
+  for (int64_t i = 0; i < def_children; ++i) {
+    const Node child = node_child(fn_def, i);
+    if (node_kind(child) == "field_initializer_list") return true;
+  }
+  // Walk down to the inner function_declarator to inspect trailing qualifiers.
+  std::vector<Node> work;
+  work.push_back(fn_def);
+  while (!work.empty()) {
+    const Node cur = work.back();
+    work.pop_back();
+    const auto ck = node_kind(cur);
+    if (ck == "compound_statement") continue;
+    if (ck == "function_declarator") {
+      const int64_t fc = node_child_count(cur);
+      for (int64_t i = 0; i < fc; ++i) {
+        const auto pk = node_kind(node_child(cur, i));
+        if (pk == "type_qualifier" || pk == "ref_qualifier" || pk == "virtual_specifier") return true;
+      }
+      return false;
+    }
+    const int64_t nc = node_child_count(cur);
+    for (int64_t i = 0; i < nc; ++i) work.push_back(node_child(cur, i));
+  }
+  return false;
 }
 
 std::string default_confidence(const std::string &kind) {
@@ -75,6 +131,7 @@ struct Raw {
   Fact fact;
   Node anchor;
   bool is_def = false;
+  std::vector<std::string> qual_scope;
 };
 
 } // namespace
@@ -128,6 +185,27 @@ std::vector<Fact> extract_facts(const Tree &tree, Grammar grammar) {
     f.end_byte = node_end_byte(*anchor);
     f.name_row = node_start_row(*name);
     f.name_col = node_start_col(*name);
+    if (grammar == Grammar::Cpp && kind == "def.method" && node_kind(*name) == "qualified_identifier") {
+      Node cur = *name;
+      while (node_kind(cur) == "qualified_identifier" && node_child_count(cur) >= 1) {
+        const int64_t n = node_child_count(cur);
+        if (n == 1) {
+          cur = node_child(cur, 0);
+          break;
+        }
+        const Node seg = node_child(cur, 0);
+        if (node_kind(seg) == "template_type" && node_child_count(seg) >= 1)
+          raw.qual_scope.push_back(node_text(node_child(seg, 0)));
+        else
+          raw.qual_scope.push_back(node_text(seg));
+        cur = node_child(cur, n - 1);
+      }
+      f.name = node_text(cur);
+      f.name_row = node_start_row(cur);
+      f.name_col = node_start_col(cur);
+      if (cpp_method_syntactically_certain(*anchor, node_kind(cur), f.name, raw.qual_scope))
+        f.confidence = "exact";
+    }
     raws.push_back(std::move(raw));
   }
 
@@ -152,11 +230,21 @@ std::vector<Fact> extract_facts(const Tree &tree, Grammar grammar) {
     std::string scope;
     for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
       if (!scope.empty()) scope += '.';
-      scope += *it;
+      scope += (grammar == Grammar::Cpp ? normalize_cpp_scope_part(*it) : *it);
+    }
+    for (const auto &q : raw.qual_scope) {
+      if (!scope.empty()) scope += '.';
+      scope += normalize_cpp_scope_part(q);
     }
     raw.fact.scope = scope;
     if (grammar == Grammar::Python && raw.fact.kind == "def.function" &&
         nearest != static_cast<size_t>(-1) && raws[nearest].fact.kind == "def.class")
+      raw.fact.kind = "def.method";
+    if (grammar == Grammar::Cpp && raw.fact.kind == "def.function" &&
+        nearest != static_cast<size_t>(-1) &&
+        (raws[nearest].fact.kind == "def.class" || raws[nearest].fact.kind == "def.struct" ||
+         raws[nearest].fact.kind == "def.union") &&
+        !has_ancestor_kind_before(raw.anchor, node_id(raws[nearest].anchor), "friend_declaration"))
       raw.fact.kind = "def.method";
   }
 

@@ -56,6 +56,9 @@ class Contracts(unittest.TestCase):
         rules=json.loads((ROOT/'rules/c-tier1.json').read_text(encoding='utf8'))['rules']
         rule=next(rule for rule in rules if rule['id']=='LBC001')
         self.assertEqual(rule['cwe'],['CWE-120']);self.assertNotIn('A03:2021',rule.get('owasp',[]))
+        cpp_rules=json.loads((ROOT/'rules/cpp-tier1.json').read_text(encoding='utf8'))['rules']
+        cpp_rule=next(rule for rule in cpp_rules if rule['id']=='CPP001')
+        self.assertEqual(cpp_rule['cwe'],['CWE-120']);self.assertNotIn('A03:2021',cpp_rule.get('owasp',[]))
     def test_invalid_metadata_is_located(self):
         for key,value in [('tags',[42]),('cwe',False),('url',4),('confidence','certain')]:
             self.rule[key]=value;self.write_pack();r=self.run_host('rules',self.pack)

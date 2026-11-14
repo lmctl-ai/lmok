@@ -1,7 +1,7 @@
 # lmok durable memory
 
 Technical documentation and operational notes for `lmok`.
-`lmok` embeds tree-sitter 0.27.1 with 11 grammars: JSON, C, Python, Bash, Java, Go, JavaScript, TypeScript, TSX, lmscript and lmcode as a standalone CLI host for lmscript.
+`lmok` embeds tree-sitter 0.27.1 with 12 grammars: JSON, C, C++, Python, Bash, Java, Go, JavaScript, TypeScript, TSX, lmscript and lmcode as a standalone CLI host for lmscript.
 Repository: https://github.com/lmctl-ai/lmok.
 
 ## Document map
@@ -30,6 +30,7 @@ Repository: https://github.com/lmctl-ai/lmok.
 | [14-invocation-return.md](14-invocation-return.md) | Invocation return ownership and terminal frames |
 | [15-script-languages.md](15-script-languages.md) | lmscript/lmcode grammars and the S5 injection seam |
 | [java.md](java.md) | Java parser, facts, nine tier-1 rules and syntax limits |
+| [cpp.md](cpp.md) | C++ parser, header policy, facts, nine tier-1 rules and known limits |
 
 Operational name: **lmok** (binary, schemas, CMake and install paths).
 The [current CLI and setup](../README.md) and [pack inventory](../rules/README.md#pack-inventory)

@@ -1,0 +1,138 @@
+{
+  "lang": "cpp",
+  "rules": [
+    {
+      "id": "CPP001",
+      "query": "((call_expression function: [(identifier) @fn (qualified_identifier name: (identifier) @fn)]) @site (#match? @fn \"^(gets|strcpy|strcat|sprintf|vsprintf)$\"))",
+      "capture": "site",
+      "message": "unsafe buffer call '{text}'",
+      "severity": "critical",
+      "tags": [
+        "cpp",
+        "security"
+      ],
+      "confidence": "high",
+      "url": "https://cwe.mitre.org/data/definitions/120.html",
+      "cwe": [
+        "CWE-120"
+      ]
+    },
+    {
+      "id": "CPP002",
+      "query": "((call_expression function: [(identifier) @fn (qualified_identifier name: (identifier) @fn)]) @site (#match? @fn \"^(system|popen|_popen|execl|execlp|execle|execv|execvp|execvpe)$\"))",
+      "capture": "site",
+      "message": "command exec call '{text}'",
+      "severity": "critical",
+      "tags": [
+        "cpp",
+        "security"
+      ],
+      "confidence": "medium",
+      "url": "https://cwe.mitre.org/data/definitions/78.html",
+      "cwe": [
+        "CWE-78"
+      ],
+      "owasp": [
+        "A03:2021"
+      ]
+    },
+    {
+      "id": "CPP003",
+      "query": "(catch_clause body: (compound_statement) @body)",
+      "text_matches": "^\\{\\s*\\}$",
+      "message": "empty catch block swallows exception",
+      "severity": "major",
+      "tags": [
+        "cpp",
+        "reliability"
+      ],
+      "confidence": "high",
+      "url": "https://cwe.mitre.org/data/definitions/390.html",
+      "cwe": [
+        "CWE-390"
+      ]
+    },
+    {
+      "id": "CPP004",
+      "query": "[(translation_unit (using_declaration \"namespace\") @u) (translation_unit (preproc_ifdef (using_declaration \"namespace\") @u)) (translation_unit (preproc_if (using_declaration \"namespace\") @u))]",
+      "message": "using namespace directive at file or header scope",
+      "severity": "major",
+      "tags": [
+        "cpp",
+        "maintainability"
+      ],
+      "confidence": "medium",
+      "url": "https://github.com/lmctl-ai/lmok#rule-packs"
+    },
+    {
+      "id": "CPP005",
+      "query": "((call_expression function: (template_function name: (identifier) @cast)) @site (#match? @cast \"^(reinterpret_cast|const_cast)$\"))",
+      "capture": "site",
+      "message": "unsafe C++ cast '{text}'",
+      "severity": "major",
+      "tags": [
+        "cpp",
+        "safety"
+      ],
+      "confidence": "medium",
+      "url": "https://cwe.mitre.org/data/definitions/704.html",
+      "cwe": [
+        "CWE-704"
+      ]
+    },
+    {
+      "id": "CPP006",
+      "query": "[(if_statement condition: (condition_clause value: (assignment_expression operator: \"=\") @assign)) (while_statement condition: (condition_clause value: (assignment_expression operator: \"=\") @assign))]",
+      "message": "assignment used directly inside condition",
+      "severity": "major",
+      "tags": [
+        "cpp",
+        "correctness"
+      ],
+      "confidence": "medium",
+      "url": "https://cwe.mitre.org/data/definitions/481.html",
+      "cwe": [
+        "CWE-481"
+      ]
+    },
+    {
+      "id": "CPP007",
+      "on": "null",
+      "text_matches": "^NULL$",
+      "message": "legacy NULL macro used (prefer nullptr)",
+      "severity": "minor",
+      "tags": [
+        "cpp",
+        "modernization"
+      ],
+      "confidence": "high",
+      "url": "https://github.com/lmctl-ai/lmok#rule-packs"
+    },
+    {
+      "id": "CPP008",
+      "on": "delete_expression",
+      "message": "manual delete expression (prefer RAII smart pointers or containers)",
+      "severity": "minor",
+      "tags": [
+        "cpp",
+        "memory",
+        "modernization"
+      ],
+      "confidence": "medium",
+      "url": "https://github.com/lmctl-ai/lmok#rule-packs"
+    },
+    {
+      "id": "CPP009",
+      "on": "preproc_def",
+      "text_matches": "^#[ \\t]*define[ \\t]+[A-Za-z_][A-Za-z0-9_]*[ \\t]+\\S",
+      "message": "value #define macro (prefer constexpr or enum class)",
+      "severity": "minor",
+      "tags": [
+        "cpp",
+        "modernization"
+      ],
+      "confidence": "medium",
+      "url": "https://github.com/lmctl-ai/lmok#rule-packs"
+    }
+  ]
+}

@@ -44,7 +44,7 @@ fi
 scripts/sync-sdk.sh --verify >/dev/null || fail "SDK header pin mismatch"
 ok "SDK headers match sdk.lock"
 scripts/sync-deps.sh --verify >/dev/null || fail "deps pin mismatch"
-ok "third_party/ tree-sitter and JSON/C/Python/Bash/Java/Go/JavaScript/TypeScript/TSX/lmscript/lmcode grammars match deps.lock"
+ok "third_party/ tree-sitter and JSON/C/C++/Python/Bash/Java/Go/JavaScript/TypeScript/TSX/lmscript/lmcode grammars match deps.lock"
 
 # release versioning (CI stamps this into the build; see scripts/next-version.sh)
 nv() { LMOK_TAGS="$1" GITHUB_REF_TYPE= GITHUB_REF_NAME= scripts/next-version.sh; }
@@ -179,7 +179,7 @@ identifier 5:2-5:8' ] || fail "query --lang c captures: $out"
 ok "query --lang c: called-function identifiers (gets, printf)"
 
 set +e; out="$("$HOST" parse --lang rust examples/data/sample.c 2>&1)"; code=$?; set -e
-[ "$code" = 2 ] && [[ "$out" == *"unknown language 'rust' (known: json, c, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)"* ]] || fail "unknown --lang (exit $code): $out"
+[ "$code" = 2 ] && [[ "$out" == *"unknown language 'rust' (known: json, c, cpp, python, bash, java, go, javascript, typescript, tsx, lmscript, lmcode)"* ]] || fail "unknown --lang (exit $code): $out"
 ok "unknown --lang refused with the known-languages list (exit 2)"
 
 # --- Go grammar (tree-sitter-go) ---
@@ -715,7 +715,7 @@ set +e; out="$("$HOST" lint "$WORK/dup.json" examples/data/sample.c 2>&1)"; code
 [ "$code" = 2 ] && [[ "$out" == *'rule DUP: duplicate rule id'* ]] || fail "duplicate rule id (exit $code): $out"
 python3 - <<'PY'
 import json
-for path, want in (("rules/c-tier1.json", 11), ("rules/json-tier1.json", 11), ("rules/go-tier1.json", 6), ("rules/javascript-tier1.json", 4), ("rules/typescript-tier1.json", 3), ("rules/tsx-tier1.json", 3)):
+for path, want in (("rules/c-tier1.json", 11), ("rules/cpp-tier1.json", 9), ("rules/json-tier1.json", 11), ("rules/go-tier1.json", 6), ("rules/javascript-tier1.json", 4), ("rules/typescript-tier1.json", 3), ("rules/tsx-tier1.json", 3)):
     ids = [r["id"] for r in json.load(open(path))["rules"]]
     assert len(ids) == want and len(set(ids)) == want, (path, ids)
 PY
@@ -976,6 +976,8 @@ python3 tests/check-language-rule-packs.py "$HOST" || fail "lmscript/lmcode rule
 ok "lmscript/lmcode migration packs: positive/negative fixtures, autofixes and config controls"
 python3 tests/check-java-os.py "$HOST" --prove-controls || fail "Java native OS oracles"
 ok "Java grammar, facts, tier-1 rules and annotated checks on native OS"
+python3 tests/check-cpp-os.py "$HOST" --prove-controls || fail "C++ native OS oracles"
+ok "C++ grammar, header policy, facts, tier-1 rules, incremental raw-string reparse and annotated checks on native OS"
 
 python3 tests/check-native-os.py "$HOST" --prove-controls || fail "native OS contracts"
 python3 tests/check-patterns.py "$HOST" || fail "pattern compiler cases"

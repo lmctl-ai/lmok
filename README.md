@@ -3,14 +3,14 @@
 tree-sitter's incremental parsing engine as a single statically-linked,
 scriptable CLI.
 
-lmok embeds [tree-sitter](https://tree-sitter.github.io) 0.27.1 and **11
-languages**: JSON, C, Python, Bash, Java, Go, JavaScript, TypeScript, TSX,
+lmok embeds [tree-sitter](https://tree-sitter.github.io) 0.27.1 and **12
+languages**: JSON, C, C++, Python, Bash, Java, Go, JavaScript, TypeScript, TSX,
 lmscript and lmcode. The last two are syntax-analysis grammars; embedded
 lmcode bodies in `.lms` files are parsed separately with absolute source positions.
 No Node runtime is needed to run the standalone binary.
 
 - Parse/query source, extract facts, measure local metrics and token duplication.
-- Lint with **17 JSON packs (117 rule entries)** and **16 lmcode rule programs**;
+- Lint with **18 JSON packs (126 rule entries)** and **16 lmcode rule programs**;
   see the [complete pack inventory](rules/README.md#pack-inventory).
 - Build a local SQLite knowledge tree with `index`, `symbols`, `refs`,
   `findings` and `status`; `facts` also exports records without a DB.
@@ -514,7 +514,7 @@ prints duplicate ranges; the default minimum window is 20 tokens.
   or string would otherwise overflow the stack. The same bound applies to
   query `#match?`.
 - Language: `rule.lang` overrides the pack-level `lang`; a rule with neither
-  is a pack error. Known languages: `json`, `c`, `python`, `bash`, `java`,
+  is a pack error. Known languages: `json`, `c`, `cpp`, `python`, `bash`, `java`,
   `go`, `javascript`, `typescript`, `tsx`, `lmscript`, `lmcode`.
 - Dispatch: per file, parse once per grammar used. `on` rules share ONE
   pre-order walk over the named nodes with a kind→rules index; `query` rules
@@ -525,7 +525,8 @@ prints duplicate ranges; the default minimum window is 20 tokens.
   then `N findings in <file>`.
 - **Directories**: a FILE argument that is a directory expands recursively to
   its regular files — hidden files/dirs BELOW the argument skipped (the
-  argument itself may live under a dot-path), only `.c`/`.h` (c), `.json`
+  argument itself may live under a dot-path), only `.c`/`.h` (c, or `.h` as `cpp`
+  with `--header-lang cpp`), `.cpp`/`.cc`/`.cxx`/`.hpp`/`.hh`/`.hxx` (cpp), `.json`
   (json), `.py` (python), `.sh`/`.bash` (bash), `.java` (java), `.go` (go),
   `.js` (javascript), `.ts` (typescript), `.tsx` (tsx), `.lms` (lmscript) and
   `.lmcode` (lmcode) are recognized, paths sorted
@@ -550,8 +551,8 @@ small demos; the canonical rule library is `rules/` (see below).
 ## Rule tiers
 
 Rules are classified by the information they need: tier 1 (CST shape + text)
-ships as **17 JSON packs with 117 rule entries** in `rules/`: nine language
-packs (C, JSON, Python, Bash, Java, Go, JavaScript, TypeScript and TSX),
+ships as **18 JSON packs with 126 rule entries** in `rules/`: ten language
+packs (C, C++, JSON, Python, Bash, Java, Go, JavaScript, TypeScript and TSX),
 plus lmscript/lmcode migration packs, four
 secrets packs (Bash, C, JSON, Python), and two autofix packs (Bash, C).
 See the [complete filename/count table](rules/README.md#pack-inventory).
@@ -789,6 +790,10 @@ Java source is supported by --lang java and .java directory targets, using the p
     lmok facts examples/java-sample.java
 
 The nine Java tier-1 rules cover empty catches, println outside methods named main, string-literal reference comparisons, stack traces, credential-looking literal fields, variable Runtime.exec, weak digests, generic catches and TODO/FIXME comments. These are syntax heuristics, not type resolution. Java facts describe classes, interfaces, methods, fields, imports and candidate calls; ts.parse_java/query_java/reparse_java are available in lmcode. See [Java behavior and limits](durable-memory/java.md).
+
+## C++
+
+C++ source is supported by `--lang cpp` and `.cpp`/`.cc`/`.cxx`/`.hpp`/`.hh`/`.hxx` targets, using the pinned tree-sitter-cpp v0.23.4 grammar. Shared `.h` headers default to `c` and can be overridden with `--header-lang c|cpp` (or `.lmok/config.json` `"header_lang"`). The nine C++ tier-1 rules (`CPP001`–`CPP009`) check unsafe C string calls, `system()`, empty catches, catch-by-value, `goto`, C-style casts, literal `NULL` in C++, `using namespace` in headers, and `TODO`/`FIXME` comments. C++ facts cover namespaces, classes, structs, unions, enums, type aliases, functions, out-of-line methods, structured bindings, default parameters, includes, and candidate calls; `ts.parse_cpp`/`query_cpp`/`reparse_cpp` are available in lmcode. See [C++ behavior and limits](durable-memory/cpp.md).
 
 
 ## Secrets packs

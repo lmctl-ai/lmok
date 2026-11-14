@@ -14,7 +14,7 @@ if not shutil.which(cc[0]):
 (ROOT / 'build').mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='scanner control ', dir=ROOT / 'build') as directory:
     work = Path(directory)
-    for lang in ('lmscript', 'lmcode'):
+    for lang in ('lmscript', 'lmcode', 'cpp'):
         grammar = ROOT / 'third_party' / ('tree-sitter-' + lang) / 'src'
         main = work / (lang + '.c')
         main.write_text('struct TSLanguage;\nextern const struct TSLanguage *tree_sitter_' + lang + '(void);\n'

@@ -6,7 +6,7 @@ Three delivery forms, by how much logic a rule needs:
   dispatcher: a tree-sitter `query` pattern or an `on` node kind, an optional
   `text_matches` regex, message, severity. No code. See [rule tiers](../docs/rule-tiers.md)
   for the framework and [Rule packs](../README.md#rule-packs) for the format.
-  The complete current inventory is below: nine tier-1 packs, four secrets
+  The complete current inventory is below: ten tier-1 packs, four secrets
   packs and two autofix packs. Pack `fix` text is a literal node replacement,
   not metavariable substitution.
   JSON checks cover credential keys, placeholders, nulls, key naming, numeric
@@ -99,9 +99,9 @@ Three delivery forms, by how much logic a rule needs:
 
 ## Pack inventory
 
-Current main has **17 packs / 117 rule entries**. Counts are entries per pack,
+Current main has **18 packs / 126 rule entries**. Counts are entries per pack,
 not globally distinct IDs: secret checks intentionally recur across languages.
-The binary supports 11 languages; the lmscript/lmcode migration packs are the
+The binary supports 12 languages; the lmscript/lmcode migration packs are the
 first shipped tier-1 JSON packs for these syntax-analysis grammars.
 
 | Pack | Language | Rules |
@@ -110,6 +110,7 @@ first shipped tier-1 JSON packs for these syntax-analysis grammars.
 | [bash-tier1.json](bash-tier1.json) | bash | 6 |
 | [c-autofix.json](c-autofix.json) | c | 2 |
 | [c-tier1.json](c-tier1.json) | c | 11 |
+| [cpp-tier1.json](cpp-tier1.json) | cpp | 9 |
 | [go-tier1.json](go-tier1.json) | go | 6 |
 | [java-tier1.json](java-tier1.json) | java | 9 |
 | [javascript-tier1.json](javascript-tier1.json) | javascript | 4 |

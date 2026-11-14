@@ -86,7 +86,7 @@ try:
     health = call(base, 'GET', '/v1/health')
     assert health['ok'] and health['preset'] == 'default' and health['idle_timeout_s'] == 120 and 0 < health['idle_remaining_ms'] <= 120000
     langs = call(base, 'GET', '/v1/languages')['languages']
-    assert 'json' in langs and 'tsx' in langs and len(langs) == 11
+    assert 'json' in langs and 'cpp' in langs and 'tsx' in langs and len(langs) == 12
     packs = call(base, 'GET', '/v1/packs')['packs']
     assert 'rules/json-tier1.json' in packs and 'rules/c-tier1.json' in packs
     assert set(call(base, 'GET', '/v1/commands')) >= {'run', 'parse', 'lint', 'lmcode'}
