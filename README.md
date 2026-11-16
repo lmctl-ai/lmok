@@ -953,3 +953,33 @@ LBC120 and the LMC001 modernization-pack advice apply only inside those bodies,
 identified structurally by the companion's `lmscript_lmcode_body` ancestor. They
 never recommend unavailable syntax for standalone `.lmcode` files. Source ranges
 remain absolute, including CRLF and Unicode inputs; no schema/VM change is needed.
+
+## Standard REST Endpoints and Stateless CLI in `lmcode`
+
+Because `lmok` embeds the canonical `lmcode` standard library (`lmcode_std_v3`), scripts can also define REST endpoints (`RestGet`, `RestPost`, `RestPut`, `RestDelete`, `RestPatch`, `RestHead`, `RestOptions`, `RestHandler`) and stateless CLI commands/options (`CliCommand`, `CliOption`) with `@"..."` path annotations and dispatch them via `rest_serve()` or `rest_cli(args)`:
+
+```lms
+program = _lmcode_ cli="lmok";
+  @"--lang"
+  fn opt_lang(x: RestExchange) -> void implements CliOption {
+    x.set("lang", x.query("lang"));
+  }
+
+  @"calls"
+  fn cmd_calls(x: RestExchange) -> void implements CliCommand {
+    let root = ts.parse_c(x.body()).root();
+    let hits = ts.query_c(root, "(call_expression function: (identifier) @fn)");
+    x.send(x.get("lang") + ":" + str(hits.len()));
+  }
+
+  @"/ast/c"
+  fn get_ast_c(x: RestExchange) -> void implements RestGet {
+    let root = ts.parse_c("int f(void) { return 42; }").root();
+    x.json("{\"children\":" + str(root.child_count()) + "}");
+  }
+
+  rest_config("session", "global");
+  $return.cli_out = rest_cli(str_split("--lang=c calls -- int main(){gets(0);}", " "));
+  $return.get_out = rest_cli(str_split("/ast/c", " "));
+end _lmcode_
+```

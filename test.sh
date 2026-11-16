@@ -106,7 +106,7 @@ import sys
 work=Path(sys.argv[1])
 registry=set((work/'registry-signatures.txt').read_text().splitlines())
 standard=set((work/'standard-signatures.txt').read_text().splitlines())
-assert len(standard)==206, len(standard)  # canonical v3 catalog including all 24 return overloads
+assert len(standard)==226, len(standard)  # canonical v3 catalog including 24 return + 20 rest/cli overloads
 (work/'host-signatures.txt').write_bytes(''.join(line+'\n' for line in sorted(registry-standard)).encode('utf-8'))
 PYHOST
 diff -u <("$LMSCRIPT" --lmcode-signatures schema/lmok.host.json --without-std) "$WORK/host-signatures.txt" || fail "host-only registry/compiler signatures differ"
@@ -1349,5 +1349,37 @@ ok "lmok serve: scan one file, deep-search related files, refine, fix and re-ver
 # --- Global structural refactoring (`lmok refactor`) ---
 python3 tests/check-refactor.py "$HOST" --prove-controls || fail "lmok refactor checks and controls"
 ok "refactor: dry-run unified diff / git-apply equivalence, IDE rename/import/rules codemods and safety controls"
+
+# --- lmcode std REST endpoints and stateless CLI (`RestGet`, `CliCommand`, `CliOption`, `rest_cli`) ---
+cat > "$WORK/std-rest-cli.lms" <<LMS
+program = _lmcode_ schema="schema/lmok.dsl.json";
+@"--lang"
+fn opt_lang(x: RestExchange) -> void implements CliOption {
+  x.set("lang", x.query("lang"));
+}
+
+@"calls"
+fn cmd_calls(x: RestExchange) -> void implements CliCommand {
+  let root = ts.parse_c(x.body()).root();
+  let hits = ts.query_c(root, "(call_expression function: (identifier) @fn)");
+  x.send(x.get("lang") + ":" + str(hits.len()));
+}
+
+@"/ast/c"
+fn get_ast_c(x: RestExchange) -> void implements RestGet {
+  let root = ts.parse_c("int f(void) { return 42; }").root();
+  x.json("{\"children\":" + str(root.child_count()) + "}");
+}
+
+rest_config("session", "global");
+\$return.cli_out = rest_cli(str_split("--lang=c calls -- int main(){gets(0);printf(0);}", " "));
+\$return.get_out = rest_cli(str_split("/ast/c", " "));
+end _lmcode_
+LMS
+compile_fixture "$WORK/std-rest-cli.lms" "$WORK/std-rest-cli.dslb" >/dev/null || fail "std-rest-cli compile"
+out="$("$HOST" --lmcode "$WORK/std-rest-cli.dslb")" || fail "std-rest-cli run"
+echo "$out" | grep -qF '"cli_out":"c:2"' || fail "std-rest-cli cli_out: $out"
+echo "$out" | grep -qF '"get_out":"{\"children\":1}"' || fail "std-rest-cli get_out: $out"
+ok "lmcode std REST endpoints and stateless CLI (RestGet, CliCommand, CliOption, rest_cli)"
 
 echo "PASS: $pass checks"
