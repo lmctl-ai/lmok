@@ -63,12 +63,12 @@ jobs:
         with:
           node-version: 24
 
-      # ci.yml's 0.2.451 compiles fixtures fine, but its run_lmcode writes an
+      # ci.yml's 0.2.482 compiles fixtures fine, but its run_lmcode writes an
       # invocation manifest without "dry", which the current host refuses, so
-      # every run_lmcode example fails there. 0.2.453 runs them all.
+      # every run_lmcode example fails there. 0.2.482 runs them all.
       - name: lmscript compiler
         run: |
-          npm i -g @lmctl-ai/lmctl@0.2.453
+          npm i -g @lmctl-ai/lmctl@0.2.482
           lmscript --version
           echo "LMCODE_COMPILER_MODULE=$(npm root -g)/@lmctl-ai/lmctl/dist/dsl.js" >> "$GITHUB_ENV"
 

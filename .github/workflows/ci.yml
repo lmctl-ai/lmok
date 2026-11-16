@@ -108,10 +108,10 @@ jobs:
         if: env.ONLY_OK == 'true'
         shell: bash
         run: |
-          # 0.2.451 is the first npm package shipping the compiler library
+          # 0.2.482 is the first npm package shipping the compiler library
           # (dist/dsl.js) that fixture compilation imports.
           # scripts/bootstrap-compiler.sh remains the from-source fallback.
-          npm i -g @lmctl-ai/lmctl@0.2.451
+          npm i -g @lmctl-ai/lmctl@0.2.482
           scripts/select-compiler.sh | tee compiler.txt
           grep -q lmscript compiler.txt || { echo "no v6 compiler available"; exit 1; }
 
