@@ -1,5 +1,7 @@
 # lmok
 
+Documentation: [Quick reference](https://www.lmctl.com/tools/lmok/) · [LLM skill](https://www.lmctl.com/tools/lmok/skill.html) · [Guide](https://www.lmctl.com/tools/lmok/guide.html) · [Reference](https://www.lmctl.com/tools/lmok/reference.html)
+
 tree-sitter's incremental parsing engine as a single statically-linked,
 scriptable CLI.
 
